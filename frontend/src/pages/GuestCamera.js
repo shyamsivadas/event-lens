@@ -110,6 +110,7 @@ const GuestCamera = () => {
         try {
           const filename = `photo_${Date.now()}.jpg`;
           
+          console.log('Requesting presigned URL...');
           const urlResponse = await axios.post(
             `${BACKEND_URL}/api/guest/${shareUrl}/presigned-url`,
             {
@@ -120,36 +121,51 @@ const GuestCamera = () => {
             }
           );
 
-          await axios.put(urlResponse.data.url, blob, {
-            headers: { 'Content-Type': 'image/jpeg' }
-          });
+          console.log('Presigned URL received:', urlResponse.data);
+          const presignedUrl = urlResponse.data.url;
 
-          await axios.post(
-            `${BACKEND_URL}/api/guest/${shareUrl}/track-upload`,
-            {
-              device_id: deviceId,
-              filename: filename,
-              s3_key: urlResponse.data.object_key
+          console.log('Uploading to R2...');
+          const uploadResponse = await axios.put(presignedUrl, blob, {
+            headers: { 
+              'Content-Type': 'image/jpeg'
             }
-          );
-
-          const newUsed = photoCount.used + 1;
-          setPhotoCount({
-            used: newUsed,
-            max: photoCount.max,
-            remaining: photoCount.max - newUsed
           });
 
-          toast.success('Photo captured!');
+          console.log('Upload response:', uploadResponse.status);
 
-          if (newUsed >= photoCount.max) {
-            setTimeout(() => {
-              navigate(`/e/${shareUrl}/thankyou`);
-            }, 1000);
+          if (uploadResponse.status === 200) {
+            await axios.post(
+              `${BACKEND_URL}/api/guest/${shareUrl}/track-upload`,
+              {
+                device_id: deviceId,
+                filename: filename,
+                s3_key: urlResponse.data.object_key
+              }
+            );
+
+            const newUsed = photoCount.used + 1;
+            setPhotoCount({
+              used: newUsed,
+              max: photoCount.max,
+              remaining: photoCount.max - newUsed
+            });
+
+            toast.success('Photo captured!');
+
+            if (newUsed >= photoCount.max) {
+              setTimeout(() => {
+                navigate(`/e/${shareUrl}/thankyou`);
+              }, 1000);
+            }
+          } else {
+            throw new Error(`Upload failed with status ${uploadResponse.status}`);
           }
         } catch (error) {
-          console.error('Upload error:', error);
-          toast.error('Failed to upload photo');
+          console.error('Upload error details:', error);
+          console.error('Error response:', error.response?.data);
+          console.error('Error status:', error.response?.status);
+          const errorMsg = error.response?.data?.detail || error.message || 'Upload failed';
+          toast.error(`Failed to upload photo: ${errorMsg}`);
         } finally {
           setCapturing(false);
         }
