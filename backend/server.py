@@ -478,18 +478,11 @@ async def create_flipbook(event_id: str, current_user: User = Depends(get_curren
             Bucket=bucket_name,
             Key=r2_pdf_key,
             Body=pdf_content,
-            ContentType='application/pdf',
-            ACL='public-read'
+            ContentType='application/pdf'
         )
         
-        pdf_url = r2_client.generate_presigned_url(
-            ClientMethod='get_object',
-            Params={
-                'Bucket': bucket_name,
-                'Key': r2_pdf_key
-            },
-            ExpiresIn=7200
-        )
+        r2_account_id = os.getenv('R2_ACCOUNT_ID')
+        pdf_url = f"https://{r2_account_id}.r2.cloudflarestorage.com/{bucket_name}/{r2_pdf_key}"
         
         async with httpx.AsyncClient() as client:
             heyzine_response = await client.post(
