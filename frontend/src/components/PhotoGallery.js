@@ -597,18 +597,30 @@ const PhotoGallery = ({ photos, eventName, galleryStyle = 'memory_archive' }) =>
           </div>
         </div>
 
-        <div className="flex-1 flex items-center justify-center p-4 relative">
+        <div className="flex-1 flex flex-col items-center justify-center p-4 relative">
           {photos.length > 1 && (
             <>
-              <button onClick={prevPhoto} className="absolute left-4 p-3 bg-white shadow-lg rounded-full hover:bg-gray-50">
+              <button onClick={prevPhoto} className="absolute left-4 p-3 bg-white shadow-lg rounded-full hover:bg-gray-50 z-10">
                 <ChevronLeft className="w-6 h-6 text-gray-700" />
               </button>
-              <button onClick={nextPhoto} className="absolute right-4 p-3 bg-white shadow-lg rounded-full hover:bg-gray-50">
+              <button onClick={nextPhoto} className="absolute right-4 p-3 bg-white shadow-lg rounded-full hover:bg-gray-50 z-10">
                 <ChevronRight className="w-6 h-6 text-gray-700" />
               </button>
             </>
           )}
-          <img src={selectedPhoto.download_url} alt={selectedPhoto.filename} className="max-h-full max-w-full object-contain" />
+          <img src={selectedPhoto.download_url} alt={selectedPhoto.filename} className="max-h-[60vh] max-w-full object-contain" />
+          
+          {/* Note display in lightbox */}
+          {selectedPhoto.note && (
+            <div className="mt-4 max-w-lg w-full">
+              <div className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3">
+                <div className="flex items-start gap-3">
+                  <MessageSquare className="w-5 h-5 text-gray-400 flex-shrink-0 mt-0.5" />
+                  <p className="text-gray-700 text-sm leading-relaxed">{selectedPhoto.note}</p>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="border-t border-gray-200 p-4 bg-white">
