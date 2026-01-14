@@ -177,6 +177,7 @@ const CreateEvent = () => {
                 {/* Minimalist Story Style */}
                 <div
                   onClick={() => setFormData({ ...formData, flipbook_style: 'minimalist_story' })}
+                  data-testid="flipbook-style-minimalist-story"
                   className={`cursor-pointer rounded-lg border-2 transition-all p-4 ${
                     formData.flipbook_style === 'minimalist_story'
                       ? 'border-primary bg-primary/10'
