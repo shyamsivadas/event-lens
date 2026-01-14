@@ -130,6 +130,7 @@ const CreateEvent = () => {
                 {/* Memory Archive Style */}
                 <div
                   onClick={() => setFormData({ ...formData, flipbook_style: 'memory_archive' })}
+                  data-testid="flipbook-style-memory-archive"
                   className={`cursor-pointer rounded-lg border-2 transition-all p-4 ${
                     formData.flipbook_style === 'memory_archive'
                       ? 'border-primary bg-primary/10'
