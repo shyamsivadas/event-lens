@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Download, Share2, ChevronLeft, ChevronRight, ZoomIn, Heart, Eye, Grid, LayoutGrid } from 'lucide-react';
+import { X, Download, Share2, ChevronLeft, ChevronRight, ZoomIn, Heart, Eye, Grid, LayoutGrid, MessageSquare } from 'lucide-react';
 import { toast } from 'sonner';
 
 const PhotoGallery = ({ photos, eventName, galleryStyle = 'memory_archive' }) => {
