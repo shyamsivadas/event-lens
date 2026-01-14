@@ -49,6 +49,7 @@ class Event(BaseModel):
     logo_url: Optional[str] = None
     filter_type: str = "warm"
     max_photos: int = 5
+    flipbook_style: str = "memory_archive"
     share_url: str
     created_at: datetime
 
