@@ -528,18 +528,10 @@ async def create_flipbook(event_id: str, current_user: User = Depends(get_curren
                     'prev_next': True,
                     'title': event_doc['name'],
                     'subtitle': f"Event Date: {event_doc['date']}",
-                    'page_effect': 'magazine',
                     'show_info': True,
-                    'show_logo': True,
-                    'show_thumbnail': True,
-                    'show_share': True,
-                    'show_download': True,
-                    'show_fullscreen': True,
-                    'show_zoom': True,
-                    'background_color': '#000000',
-                    'text_color': '#ffffff',
-                    'autoplay': False,
-                    'autoplay_interval': 5
+                    'download': True,
+                    'full_screen': True,
+                    'share': True
                 },
                 headers={
                     'Authorization': f'Bearer {heyzine_api_key}',
