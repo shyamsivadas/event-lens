@@ -1,51 +1,63 @@
-import { useEffect } from "react";
-import "@/App.css";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import axios from "axios";
+import React from 'react';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { Toaster } from '@/components/ui/sonner';
+import LoginPage from '@/pages/LoginPage';
+import AuthCallback from '@/pages/AuthCallback';
+import Dashboard from '@/pages/Dashboard';
+import CreateEvent from '@/pages/CreateEvent';
+import EventDetails from '@/pages/EventDetails';
+import GuestCamera from '@/pages/GuestCamera';
+import ThankYou from '@/pages/ThankYou';
+import ProtectedRoute from '@/components/ProtectedRoute';
+import './App.css';
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
-const API = `${BACKEND_URL}/api`;
-
-const Home = () => {
-  const helloWorldApi = async () => {
-    try {
-      const response = await axios.get(`${API}/`);
-      console.log(response.data.message);
-    } catch (e) {
-      console.error(e, `errored out requesting / api`);
-    }
-  };
-
-  useEffect(() => {
-    helloWorldApi();
-  }, []);
-
+function AppRouter() {
+  const location = useLocation();
+  
+  if (location.hash?.includes('session_id=')) {
+    return <AuthCallback />;
+  }
+  
   return (
-    <div>
-      <header className="App-header">
-        <a
-          className="App-link"
-          href="https://emergent.sh"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <img src="https://avatars.githubusercontent.com/in/1201222?s=120&u=2686cf91179bbafbc7a71bfbc43004cf9ae1acea&v=4" />
-        </a>
-        <p className="mt-5">Building something incredible ~!</p>
-      </header>
-    </div>
+    <Routes>
+      <Route path="/login" element={<LoginPage />} />
+      <Route
+        path="/dashboard"
+        element={
+          <ProtectedRoute>
+            <Dashboard />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/events/create"
+        element={
+          <ProtectedRoute>
+            <CreateEvent />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/events/:eventId"
+        element={
+          <ProtectedRoute>
+            <EventDetails />
+          </ProtectedRoute>
+        }
+      />
+      <Route path="/e/:shareUrl" element={<GuestCamera />} />
+      <Route path="/e/:shareUrl/thankyou" element={<ThankYou />} />
+      <Route path="/" element={<Navigate to="/dashboard" replace />} />
+    </Routes>
   );
-};
+}
 
 function App() {
   return (
     <div className="App">
       <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Home />}>
-            <Route index element={<Home />} />
-          </Route>
-        </Routes>
+        <AppRouter />
+        <Toaster position="top-right" richColors />
       </BrowserRouter>
     </div>
   );
