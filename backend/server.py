@@ -306,24 +306,23 @@ async def get_guest_presigned_url(share_url: str, request: PresignedURLRequest):
     if photo_count >= event_doc["max_photos"]:
         raise HTTPException(status_code=403, detail="Photo limit reached")
     
-    r2_client = get_r2_client()
-    bucket_name = os.getenv('R2_BUCKET_NAME', 'event-photos')
+    gcs_client, bucket_name = get_gcs_client()
     
-    if not r2_client:
+    if not gcs_client:
         raise HTTPException(status_code=500, detail="Storage not configured")
     
     timestamp = int(datetime.now(timezone.utc).timestamp() * 1000)
     object_key = f"events/{event_doc['event_id']}/photos/{request.device_id}/{timestamp}-{request.filename}"
     
     try:
-        presigned_url = r2_client.generate_presigned_url(
-            ClientMethod='put_object',
-            Params={
-                'Bucket': bucket_name,
-                'Key': object_key,
-                'ContentType': request.content_type
-            },
-            ExpiresIn=600
+        bucket = gcs_client.bucket(bucket_name)
+        blob = bucket.blob(object_key)
+        
+        presigned_url = blob.generate_signed_url(
+            version="v4",
+            expiration=timedelta(seconds=600),
+            method="PUT",
+            content_type=request.content_type
         )
         
         return {
@@ -331,7 +330,7 @@ async def get_guest_presigned_url(share_url: str, request: PresignedURLRequest):
             "object_key": object_key,
             "expires_in": 600
         }
-    except ClientError as e:
+    except Exception as e:
         logger.error(f"Failed to generate presigned URL: {e}")
         raise HTTPException(status_code=500, detail="Failed to generate upload URL")
 
