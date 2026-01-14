@@ -38,6 +38,7 @@ SnapShare is a full-stack application that allows event hosts to collect photos 
   - **Wedding Filters**: Romance, Royal, Pure, Candle, Memory
 - [x] Live filter preview (CSS approximation for performance)
 - [x] Filters baked into captured images (Canvas pixel manipulation)
+- [x] **Photo Notes** - Guests can add thoughts/messages with each photo (280 char max)
 - [x] Front/back camera toggle
 - [x] Flash control
 - [x] Photo limit enforcement per device
