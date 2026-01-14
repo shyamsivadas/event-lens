@@ -46,9 +46,15 @@ SnapShare is a full-stack application that allows event hosts to collect photos 
 ### Photo Storage & Gallery
 - [x] Cloudflare R2 cloud storage integration
 - [x] Presigned URLs for secure upload/download
-- [x] Pixieset-inspired professional gallery
-- [x] Lightbox viewer for individual photos
+- [x] **Enhanced Photo Gallery with 3 styled views:**
+  - **Memory Archive**: Scattered polaroid-style layout with rotation effects
+  - **Typography Collage**: Bold colored grid with text overlays (LOVE/JOY/LIFE/FUN)
+  - **Minimalist Story**: Clean Instagram-style grid with progress dots
+- [x] View mode toggle (Grid vs Styled view)
+- [x] Preview button on each photo with styled lightbox
+- [x] Lightbox viewer with keyboard navigation
 - [x] Auto-refresh (10-second polling)
+- [x] Download All as ZIP
 
 ### Flipbook Generation
 - [x] Heyzine API integration
