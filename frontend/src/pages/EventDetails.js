@@ -280,7 +280,11 @@ const EventDetails = () => {
               <p className="text-muted-foreground">No photos yet. Share the link with guests to start collecting!</p>
             </div>
           ) : (
-            <PhotoGallery photos={photos} eventName={event.name} />
+            <PhotoGallery 
+              photos={photos} 
+              eventName={event.name} 
+              galleryStyle={event.flipbook_style || 'memory_archive'}
+            />
           )}
         </div>
       </div>
