@@ -382,6 +382,7 @@ async def track_upload(share_url: str, photo_data: dict):
         "device_id": photo_data["device_id"],
         "filename": photo_data["filename"],
         "s3_key": photo_data["s3_key"],
+        "note": photo_data.get("note", ""),
         "uploaded_at": datetime.now(timezone.utc)
     }
     
