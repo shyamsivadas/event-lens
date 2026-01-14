@@ -417,46 +417,73 @@ async def create_flipbook(event_id: str, current_user: User = Depends(get_curren
             c = canvas.Canvas(pdf_path, pagesize=landscape(A4))
             page_width, page_height = landscape(A4)
             
-            # Magazine-style layout: 2 photos per page (larger, more professional)
-            photos_per_page = 2
-            margin = 30
-            spacing = 20
+            # Professional magazine layout
+            photos_per_page = 1  # One large photo per page for maximum impact
+            margin = 40
             
-            cols = 2
-            rows = 1
-            img_width = (page_width - 2 * margin - spacing) / cols
+            # Calculate dimensions for full-bleed photo
+            img_width = page_width - 2 * margin
             img_height = page_height - 2 * margin
             
-            # Add a stylish title page
-            c.setFont("Helvetica-Bold", 36)
-            c.setFillColorRGB(0.1, 0.1, 0.1)
+            # Create elegant title page with gradient effect
+            from reportlab.lib.colors import HexColor, black, white
+            
+            # Dark gradient background for title page
+            c.setFillColor(HexColor('#0a0a0a'))
+            c.rect(0, 0, page_width, page_height, fill=1, stroke=0)
+            
+            # Add decorative line
+            c.setStrokeColor(HexColor('#6366f1'))
+            c.setLineWidth(3)
+            c.line(margin, page_height / 2 + 80, page_width - margin, page_height / 2 + 80)
+            
+            # Title with elegant font
+            c.setFont("Helvetica-Bold", 48)
+            c.setFillColor(white)
             title_text = event_doc['name']
-            title_width = c.stringWidth(title_text, "Helvetica-Bold", 36)
-            c.drawString((page_width - title_width) / 2, page_height / 2 + 30, title_text)
+            title_width = c.stringWidth(title_text, "Helvetica-Bold", 48)
+            c.drawString((page_width - title_width) / 2, page_height / 2 + 20, title_text)
             
-            c.setFont("Helvetica", 18)
-            c.setFillColorRGB(0.4, 0.4, 0.4)
-            subtitle_text = f"Event Date: {event_doc['date']}"
-            subtitle_width = c.stringWidth(subtitle_text, "Helvetica", 18)
-            c.drawString((page_width - subtitle_width) / 2, page_height / 2 - 10, subtitle_text)
+            # Subtitle with accent color
+            c.setFont("Helvetica", 20)
+            c.setFillColor(HexColor('#6366f1'))
+            subtitle_text = f"Event Photography Collection"
+            subtitle_width = c.stringWidth(subtitle_text, "Helvetica", 20)
+            c.drawString((page_width - subtitle_width) / 2, page_height / 2 - 20, subtitle_text)
             
+            # Event date
+            c.setFont("Helvetica", 16)
+            c.setFillColor(HexColor('#9ca3af'))
+            date_text = event_doc['date']
+            date_width = c.stringWidth(date_text, "Helvetica", 16)
+            c.drawString((page_width - date_width) / 2, page_height / 2 - 50, date_text)
+            
+            # Photo count badge
             c.setFont("Helvetica", 14)
-            photo_count_text = f"{len(photos)} Beautiful Memories"
+            photo_count_text = f"{len(photos)} Captured Moments"
             count_width = c.stringWidth(photo_count_text, "Helvetica", 14)
-            c.drawString((page_width - count_width) / 2, page_height / 2 - 40, photo_count_text)
+            
+            # Badge background
+            badge_x = (page_width - count_width) / 2 - 20
+            badge_y = page_height / 2 - 90
+            c.setFillColor(HexColor('#6366f1'))
+            c.roundRect(badge_x, badge_y, count_width + 40, 30, 15, fill=1, stroke=0)
+            
+            c.setFillColor(white)
+            c.drawString(badge_x + 20, badge_y + 8, photo_count_text)
+            
+            # Add decorative bottom line
+            c.setStrokeColor(HexColor('#6366f1'))
+            c.setLineWidth(3)
+            c.line(margin, page_height / 2 - 150, page_width - margin, page_height / 2 - 150)
             
             c.showPage()
             
+            # Photo pages with professional layout
             for idx, photo in enumerate(photos):
-                if idx > 0 and idx % photos_per_page == 0:
-                    c.showPage()
-                
-                position = idx % photos_per_page
-                col = position % cols
-                row = position // cols
-                
-                x = margin + col * (img_width + spacing)
-                y = margin
+                # White background for photo pages
+                c.setFillColor(white)
+                c.rect(0, 0, page_width, page_height, fill=1, stroke=0)
                 
                 try:
                     response = r2_client.get_object(
@@ -467,39 +494,83 @@ async def create_flipbook(event_id: str, current_user: User = Depends(get_curren
                     
                     img = Image.open(io.BytesIO(image_data))
                     
-                    # Convert to RGB if needed (for JPEG compatibility)
+                    # Convert to RGB if needed
                     if img.mode in ('RGBA', 'LA', 'P'):
                         img = img.convert('RGB')
                     
+                    # Save to temporary file
+                    with tempfile.NamedTemporaryFile(suffix='.jpg', delete=False) as temp_img:
+                        img.save(temp_img.name, 'JPEG', quality=95)
+                        temp_img_path = temp_img.name
+                    
+                    # Calculate centered position with letterboxing
                     img_ratio = img.width / img.height
                     box_ratio = img_width / img_height
                     
-                    # Save to temporary file for ReportLab
-                    with tempfile.NamedTemporaryFile(suffix='.jpg', delete=False) as temp_img:
-                        img.save(temp_img.name, 'JPEG', quality=85)
-                        temp_img_path = temp_img.name
-                    
                     if img_ratio > box_ratio:
-                        new_width = img_width
-                        new_height = img_width / img_ratio
-                        y_offset = (img_height - new_height) / 2
-                        c.drawImage(temp_img_path, x, y + y_offset, 
-                                   width=new_width, height=new_height, 
-                                   preserveAspectRatio=True, mask='auto')
+                        # Image is wider
+                        display_width = img_width
+                        display_height = img_width / img_ratio
+                        x = margin
+                        y = margin + (img_height - display_height) / 2
                     else:
-                        new_height = img_height
-                        new_width = img_height * img_ratio
-                        x_offset = (img_width - new_width) / 2
-                        c.drawImage(temp_img_path, x + x_offset, y, 
-                                   width=new_width, height=new_height, 
-                                   preserveAspectRatio=True, mask='auto')
+                        # Image is taller
+                        display_height = img_height
+                        display_width = img_height * img_ratio
+                        x = margin + (img_width - display_width) / 2
+                        y = margin
+                    
+                    # Draw shadow effect
+                    c.setFillColor(HexColor('#00000020'))
+                    c.rect(x + 5, y - 5, display_width, display_height, fill=1, stroke=0)
+                    
+                    # Draw the image
+                    c.drawImage(temp_img_path, x, y, 
+                               width=display_width, height=display_height, 
+                               preserveAspectRatio=True, mask='auto')
+                    
+                    # Add elegant border
+                    c.setStrokeColor(HexColor('#e5e7eb'))
+                    c.setLineWidth(2)
+                    c.rect(x, y, display_width, display_height, fill=0, stroke=1)
                     
                     # Clean up temp file
                     os.unlink(temp_img_path)
                     
+                    # Add page number at bottom
+                    c.setFont("Helvetica", 10)
+                    c.setFillColor(HexColor('#6b7280'))
+                    page_num_text = f"{idx + 1} of {len(photos)}"
+                    page_num_width = c.stringWidth(page_num_text, "Helvetica", 10)
+                    c.drawString((page_width - page_num_width) / 2, 15, page_num_text)
+                    
+                    # Add event name in footer
+                    c.setFont("Helvetica", 8)
+                    c.setFillColor(HexColor('#9ca3af'))
+                    footer_text = event_doc['name']
+                    c.drawString(margin, 15, footer_text)
+                    
                 except Exception as e:
                     logger.error(f"Failed to add photo to PDF: {e}")
                     continue
+                
+                c.showPage()
+            
+            # Add elegant closing page
+            c.setFillColor(HexColor('#0a0a0a'))
+            c.rect(0, 0, page_width, page_height, fill=1, stroke=0)
+            
+            c.setFont("Helvetica-Bold", 36)
+            c.setFillColor(white)
+            thank_you_text = "Thank You"
+            thank_you_width = c.stringWidth(thank_you_text, "Helvetica-Bold", 36)
+            c.drawString((page_width - thank_you_width) / 2, page_height / 2 + 20, thank_you_text)
+            
+            c.setFont("Helvetica", 16)
+            c.setFillColor(HexColor('#9ca3af'))
+            closing_text = "For making this event memorable"
+            closing_width = c.stringWidth(closing_text, "Helvetica", 16)
+            c.drawString((page_width - closing_width) / 2, page_height / 2 - 20, closing_text)
             
             c.save()
         
