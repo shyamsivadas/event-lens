@@ -1,0 +1,141 @@
+{
+  "design_system": {
+    "identity": {
+      "name": "Event Lens",
+      "archetype": "Cinematic Dark (Jewel & Neon)",
+      "core_values": ["Instant", "Immersive", "Magical"],
+      "vibe": "Backstage at a concert meets high-end wedding photography."
+    },
+    "typography": {
+      "headings": {
+        "family": "Syne, sans-serif",
+        "weights": ["700", "800"],
+        "usage": "Hero titles, Event Names, Impact numbers",
+        "letter_spacing": "-0.02em"
+      },
+      "body": {
+        "family": "Manrope, sans-serif",
+        "weights": ["400", "500", "600"],
+        "usage": "UI elements, buttons, instructions, dashboard data"
+      },
+      "mono": {
+        "family": "JetBrains Mono, monospace",
+        "usage": "Timers, counters (3/5), technical details"
+      }
+    },
+    "colors": {
+      "palette": {
+        "background": "#050505",
+        "surface": "#0A0A0A",
+        "surface_highlight": "#121212",
+        "primary": "#6366f1",
+        "primary_glow": "rgba(99, 102, 241, 0.5)",
+        "secondary": "#ec4899",
+        "accent": "#eab308",
+        "text_primary": "#ffffff",
+        "text_secondary": "#a1a1aa",
+        "border": "#27272a",
+        "success": "#22c55e",
+        "error": "#ef4444"
+      },
+      "gradients": {
+        "brand": "linear-gradient(135deg, #6366f1 0%, #ec4899 100%)",
+        "glass": "linear-gradient(180deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.02) 100%)",
+        "overlay": "linear-gradient(to bottom, rgba(0,0,0,0.4) 0%, rgba(0,0,0,0) 20%, rgba(0,0,0,0) 80%, rgba(0,0,0,0.8) 100%)"
+      }
+    },
+    "spacing": {
+      "container_padding": "p-6 md:p-12",
+      "section_gap": "gap-12 md:gap-24",
+      "grid_gap": "gap-4 md:gap-8"
+    },
+    "radius": {
+      "default": "0.75rem",
+      "button": "9999px",
+      "card": "1rem"
+    },
+    "shadows": {
+      "glow": "0 0 20px rgba(99, 102, 241, 0.3)",
+      "glass": "0 8px 32px 0 rgba(0, 0, 0, 0.37)"
+    }
+  },
+  "components": {
+    "buttons": {
+      "primary": "bg-primary text-white hover:bg-primary/90 shadow-[0_0_15px_rgba(99,102,241,0.4)] transition-all active:scale-95",
+      "secondary": "bg-white/10 backdrop-blur-md border border-white/10 text-white hover:bg-white/20",
+      "ghost": "hover:bg-white/5 text-white/70 hover:text-white",
+      "capture": "w-20 h-20 rounded-full border-4 border-white bg-transparent hover:bg-white/20 active:scale-90 transition-all duration-100"
+    },
+    "cards": {
+      "glass": "bg-black/40 backdrop-blur-xl border border-white/10 shadow-glass",
+      "solid": "bg-surface border border-border hover:border-primary/50 transition-colors"
+    },
+    "inputs": {
+      "default": "bg-surface_highlight border-border focus:border-primary focus:ring-1 focus:ring-primary/50 h-12"
+    }
+  },
+  "layout_strategies": {
+    "guest_camera": {
+      "type": "Absolute Overlay",
+      "rules": [
+        "Video element must be object-cover w-full h-full absolute inset-0 -z-10",
+        "UI controls must float on top with z-50",
+        "Top bar: Event Logo + Counter (Glassmorphism)",
+        "Bottom bar: Capture Button + Gallery Toggle + Filters",
+        "NO white backgrounds. All UI must be transparent/glass."
+      ]
+    },
+    "host_dashboard": {
+      "type": "Bento Grid",
+      "rules": [
+        "Sidebar navigation (collapsible on mobile)",
+        "Main content area with generous padding",
+        "Stats cards: High contrast numbers",
+        "Gallery grid: Masonry layout for mixed aspect ratios"
+      ]
+    }
+  },
+  "assets": {
+    "images": {
+      "hero_bg": "https://images.unsplash.com/photo-1571435763834-4d6fbb550bb7",
+      "login_bg": "https://images.unsplash.com/photo-1699616038948-a82d0babcfe7",
+      "camera_placeholder": "https://images.unsplash.com/photo-1758186334264-d1ab8a079aa2"
+    },
+    "icons": {
+      "library": "lucide-react",
+      "style": "Stroke width 1.5px for elegance"
+    }
+  },
+  "motion": {
+    "transitions": "transition-all duration-300 ease-out",
+    "animations": {
+      "fade_in": "animate-in fade-in duration-500",
+      "slide_up": "animate-in slide-in-from-bottom-4 duration-500",
+      "flash": "animate-[flash_0.2s_ease-out]"
+    }
+  },
+  "instructions_to_main_agent": [
+    "CRITICAL: The Guest Camera flow is the most important part. It must feel NATIVE.",
+    "Use 'react-webcam' or native 'navigator.mediaDevices.getUserMedia' for the camera.",
+    "Implement filters using CSS filters (grayscale, sepia, contrast) applied to the video feed AND the captured canvas.",
+    "For the Host Dashboard, use Shadcn components but override the background to #050505.",
+    "Ensure the 'Counter' (3/5) is always visible and pulses when a photo is taken.",
+    "Use 'framer-motion' for the flash effect and gallery entrance animations.",
+    "Do not use 'Inter'. Use 'Manrope' for UI and 'Syne' for headings.",
+    "Ensure all touch targets on mobile are at least 44px."
+  ],
+  "universal_guidelines": [
+    "Dark colors look good when used independently without gradients. DO NOT use dark colors as gradients",
+    "Don't make generic centered layouts, simplistic gradients, and uniform styling.",
+    "Create depth through layered design elements with z-index hierarchy",
+    "Use glass-morphism effects with backdrop filters (12-24px blur)",
+    "You MUST NOT apply universal transition. Eg: transition: all.",
+    "You MUST NOT center align the app container.",
+    "Always use modern button styles like pill-shaped, or sharp button with interaction animations.",
+    "NEVER: use AI assistant Emoji characters.",
+    "Every interaction needs micro-animations.",
+    "Use 2-3x more spacing than feels comfortable.",
+    "Subtle grain textures, noise overlays, custom cursors, selection states, and loading animations.",
+    "Use 'sonner' for toasts."
+  ]
+}
