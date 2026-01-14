@@ -514,7 +514,7 @@ const PhotoGallery = ({ photos, eventName, galleryStyle = 'memory_archive' }) =>
           )}
 
           {/* Image with style-specific frame */}
-          <div className={`max-w-3xl max-h-[70vh] ${config.frame}`}>
+          <div className={`max-w-3xl max-h-[70vh] ${config.frame} relative`}>
             <img
               src={selectedPhoto.download_url}
               alt={selectedPhoto.filename}
@@ -531,6 +531,18 @@ const PhotoGallery = ({ photos, eventName, galleryStyle = 'memory_archive' }) =>
               </div>
             )}
           </div>
+          
+          {/* Note display */}
+          {selectedPhoto.note && (
+            <div className="mt-4 max-w-lg mx-auto">
+              <div className="bg-white/10 backdrop-blur-sm rounded-xl px-4 py-3">
+                <div className="flex items-start gap-3">
+                  <MessageSquare className="w-5 h-5 text-white/60 flex-shrink-0 mt-0.5" />
+                  <p className="text-white/90 text-sm leading-relaxed">{selectedPhoto.note}</p>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Thumbnail strip */}
