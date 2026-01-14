@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import FingerprintJS from '@fingerprintjs/fingerprintjs';
-import { Camera as CameraIcon, SwitchCamera, Zap, ZapOff } from 'lucide-react';
+import { SwitchCamera, Zap, ZapOff, MessageSquare, X, Send } from 'lucide-react';
 import { toast } from 'sonner';
 import { applyFilter, getPreviewFilter, PREMIUM_FILTERS } from '@/utils/filters';
 
@@ -26,6 +26,11 @@ const GuestCamera = () => {
   const [showFlash, setShowFlash] = useState(false);
   const [loading, setLoading] = useState(true);
   const [useAdvancedPreview, setUseAdvancedPreview] = useState(false);
+  
+  // Notes feature
+  const [showNoteInput, setShowNoteInput] = useState(false);
+  const [note, setNote] = useState('');
+  const [pendingCapture, setPendingCapture] = useState(null);
 
   useEffect(() => {
     initializeCamera();
@@ -62,11 +67,7 @@ const GuestCamera = () => {
       if (video.readyState >= 2) {
         previewCanvas.width = video.videoWidth;
         previewCanvas.height = video.videoHeight;
-        
-        // Draw video frame
         ctx.drawImage(video, 0, 0);
-        
-        // Apply premium filter
         applyFilter(ctx, previewCanvas, event.filter_type);
       }
       animationRef.current = requestAnimationFrame(renderFrame);
@@ -129,94 +130,102 @@ const GuestCamera = () => {
   const capturePhoto = async () => {
     if (capturing || photoCount.remaining <= 0) return;
 
+    // Capture the image first
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    applyFilter(ctx, canvas, event.filter_type);
+
+    // Convert to blob and store for later upload
+    canvas.toBlob((blob) => {
+      setPendingCapture(blob);
+      setShowNoteInput(true);
+      setShowFlash(true);
+      setTimeout(() => setShowFlash(false), 200);
+    }, 'image/jpeg', 0.92);
+  };
+
+  const uploadPhotoWithNote = async (includeNote = true) => {
+    if (!pendingCapture) return;
+    
     setCapturing(true);
-    setShowFlash(true);
-    setTimeout(() => setShowFlash(false), 200);
+    setShowNoteInput(false);
 
     try {
-      const video = videoRef.current;
-      const canvas = canvasRef.current;
+      const filename = `photo_${Date.now()}.jpg`;
+      const photoNote = includeNote ? note.trim() : '';
       
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      
-      const ctx = canvas.getContext('2d');
-      
-      // Draw video frame first
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-      
-      // Apply premium filter (baked into the image)
-      applyFilter(ctx, canvas, event.filter_type);
-
-      canvas.toBlob(async (blob) => {
-        try {
-          const filename = `photo_${Date.now()}.jpg`;
-          
-          console.log('Requesting presigned URL...');
-          const urlResponse = await axios.post(
-            `${BACKEND_URL}/api/guest/${shareUrl}/presigned-url`,
-            {
-              event_id: event.event_id,
-              device_id: deviceId,
-              filename: filename,
-              content_type: 'image/jpeg'
-            }
-          );
-
-          console.log('Presigned URL received:', urlResponse.data);
-          const presignedUrl = urlResponse.data.url;
-
-          console.log('Uploading to R2...');
-          const uploadResponse = await axios.put(presignedUrl, blob, {
-            headers: { 
-              'Content-Type': 'image/jpeg'
-            }
-          });
-
-          console.log('Upload response:', uploadResponse.status);
-
-          if (uploadResponse.status === 200) {
-            await axios.post(
-              `${BACKEND_URL}/api/guest/${shareUrl}/track-upload`,
-              {
-                device_id: deviceId,
-                filename: filename,
-                s3_key: urlResponse.data.object_key
-              }
-            );
-
-            const newUsed = photoCount.used + 1;
-            setPhotoCount({
-              used: newUsed,
-              max: photoCount.max,
-              remaining: photoCount.max - newUsed
-            });
-
-            toast.success('Photo captured!');
-
-            if (newUsed >= photoCount.max) {
-              setTimeout(() => {
-                navigate(`/e/${shareUrl}/thankyou`);
-              }, 1000);
-            }
-          } else {
-            throw new Error(`Upload failed with status ${uploadResponse.status}`);
-          }
-        } catch (error) {
-          console.error('Upload error details:', error);
-          console.error('Error response:', error.response?.data);
-          console.error('Error status:', error.response?.status);
-          const errorMsg = error.response?.data?.detail || error.message || 'Upload failed';
-          toast.error(`Failed to upload photo: ${errorMsg}`);
-        } finally {
-          setCapturing(false);
+      console.log('Requesting presigned URL...');
+      const urlResponse = await axios.post(
+        `${BACKEND_URL}/api/guest/${shareUrl}/presigned-url`,
+        {
+          event_id: event.event_id,
+          device_id: deviceId,
+          filename: filename,
+          content_type: 'image/jpeg'
         }
-      }, 'image/jpeg', 0.92);
+      );
+
+      console.log('Presigned URL received:', urlResponse.data);
+      const presignedUrl = urlResponse.data.url;
+
+      console.log('Uploading to R2...');
+      const uploadResponse = await axios.put(presignedUrl, pendingCapture, {
+        headers: { 
+          'Content-Type': 'image/jpeg'
+        }
+      });
+
+      console.log('Upload response:', uploadResponse.status);
+
+      if (uploadResponse.status === 200) {
+        await axios.post(
+          `${BACKEND_URL}/api/guest/${shareUrl}/track-upload`,
+          {
+            device_id: deviceId,
+            filename: filename,
+            s3_key: urlResponse.data.object_key,
+            note: photoNote
+          }
+        );
+
+        const newUsed = photoCount.used + 1;
+        setPhotoCount({
+          used: newUsed,
+          max: photoCount.max,
+          remaining: photoCount.max - newUsed
+        });
+
+        toast.success(photoNote ? 'Photo & note captured!' : 'Photo captured!');
+        setNote('');
+        setPendingCapture(null);
+
+        if (newUsed >= photoCount.max) {
+          setTimeout(() => {
+            navigate(`/e/${shareUrl}/thankyou`);
+          }, 1000);
+        }
+      } else {
+        throw new Error(`Upload failed with status ${uploadResponse.status}`);
+      }
     } catch (error) {
-      console.error('Capture error:', error);
-      toast.error('Failed to capture photo');
+      console.error('Upload error details:', error);
+      const errorMsg = error.response?.data?.detail || error.message || 'Upload failed';
+      toast.error(`Failed to upload photo: ${errorMsg}`);
+    } finally {
       setCapturing(false);
     }
+  };
+
+  const cancelCapture = () => {
+    setShowNoteInput(false);
+    setNote('');
+    setPendingCapture(null);
   };
 
   // Get filter info for display
@@ -247,7 +256,7 @@ const GuestCamera = () => {
 
   return (
     <div className="fixed inset-0 bg-black overflow-hidden" data-testid="guest-camera">
-      {/* Video element - hidden when using advanced preview */}
+      {/* Video element */}
       <video
         ref={videoRef}
         autoPlay
@@ -258,7 +267,7 @@ const GuestCamera = () => {
         data-testid="camera-video"
       />
       
-      {/* Advanced preview canvas - shows real filter effect */}
+      {/* Advanced preview canvas */}
       {useAdvancedPreview && (
         <canvas
           ref={previewCanvasRef}
@@ -273,6 +282,88 @@ const GuestCamera = () => {
       {/* Flash effect */}
       {showFlash && (
         <div className="absolute inset-0 bg-white flash-effect z-50" />
+      )}
+
+      {/* Note Input Modal */}
+      {showNoteInput && (
+        <div className="absolute inset-0 z-40 bg-black/80 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
+            {/* Preview of captured photo */}
+            <div className="relative aspect-video bg-gray-900">
+              <canvas 
+                ref={(el) => {
+                  if (el && pendingCapture) {
+                    const ctx = el.getContext('2d');
+                    const img = new Image();
+                    img.onload = () => {
+                      el.width = img.width;
+                      el.height = img.height;
+                      ctx.drawImage(img, 0, 0);
+                    };
+                    img.src = URL.createObjectURL(pendingCapture);
+                  }
+                }}
+                className="w-full h-full object-cover"
+              />
+              <button
+                onClick={cancelCapture}
+                className="absolute top-3 right-3 p-2 bg-black/50 rounded-full text-white hover:bg-black/70 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            {/* Note input */}
+            <div className="p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <MessageSquare className="w-5 h-5 text-gray-500" />
+                <span className="text-sm font-medium text-gray-700">Add a note (optional)</span>
+              </div>
+              
+              <textarea
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                placeholder="Share your thoughts about this moment..."
+                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none resize-none text-gray-800 placeholder:text-gray-400"
+                rows={3}
+                maxLength={280}
+                autoFocus
+                data-testid="photo-note-input"
+              />
+              
+              <div className="flex items-center justify-between mt-2">
+                <span className="text-xs text-gray-400">{note.length}/280</span>
+              </div>
+              
+              {/* Action buttons */}
+              <div className="flex gap-3 mt-4">
+                <button
+                  onClick={() => uploadPhotoWithNote(false)}
+                  disabled={capturing}
+                  className="flex-1 px-4 py-3 border border-gray-200 rounded-xl text-gray-700 hover:bg-gray-50 transition-colors font-medium"
+                  data-testid="skip-note-btn"
+                >
+                  Skip Note
+                </button>
+                <button
+                  onClick={() => uploadPhotoWithNote(true)}
+                  disabled={capturing}
+                  className="flex-1 px-4 py-3 bg-black text-white rounded-xl hover:bg-gray-800 transition-colors font-medium flex items-center justify-center gap-2"
+                  data-testid="save-with-note-btn"
+                >
+                  {capturing ? (
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white" />
+                  ) : (
+                    <>
+                      <Send className="w-4 h-4" />
+                      Save
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* UI Overlay */}
@@ -301,6 +392,13 @@ const GuestCamera = () => {
 
         <div className="flex-1" />
 
+        {/* Hint text */}
+        <div className="text-center mb-4">
+          <p className="text-white/60 text-sm bg-black/30 inline-block px-4 py-2 rounded-full">
+            📝 Add a note with your photo!
+          </p>
+        </div>
+
         {/* Controls */}
         <div className="p-8 flex items-center justify-between">
           <button
@@ -313,7 +411,7 @@ const GuestCamera = () => {
 
           <button
             onClick={capturePhoto}
-            disabled={capturing || photoCount.remaining <= 0}
+            disabled={capturing || photoCount.remaining <= 0 || showNoteInput}
             className="capture-button"
             data-testid="capture-btn"
           >
