@@ -5,7 +5,7 @@ from datetime import datetime, timezone, timedelta
 import uuid
 
 class EventPhotoAPITester:
-    def __init__(self, base_url="https://snapshare-156.preview.emergentagent.com"):
+    def __init__(self, base_url="https://snapshare-157.preview.emergentagent.com"):
         self.base_url = base_url
         self.session_token = None
         self.user_id = None
