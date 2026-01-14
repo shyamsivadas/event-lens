@@ -386,6 +386,386 @@ async def track_upload(share_url: str, photo_data: dict):
     await db.photos.insert_one(photo_doc)
     return {"success": True}
 
+from reportlab.lib.colors import HexColor, black, white
+
+def fetch_and_prepare_image(r2_client, bucket_name, s3_key):
+    """Helper to fetch image from R2 and prepare it for PDF"""
+    response = r2_client.get_object(Bucket=bucket_name, Key=s3_key)
+    image_data = response['Body'].read()
+    img = Image.open(io.BytesIO(image_data))
+    if img.mode in ('RGBA', 'LA', 'P'):
+        img = img.convert('RGB')
+    temp_file = tempfile.NamedTemporaryFile(suffix='.jpg', delete=False)
+    img.save(temp_file.name, 'JPEG', quality=95)
+    return img, temp_file.name
+
+def generate_memory_archive_pdf(c, photos, event_doc, page_width, page_height, r2_client, bucket_name):
+    """Style 1: Memory Archive - Documentary style with scattered grid layout"""
+    margin = 40
+    
+    # Title Page - Dark cinematic style
+    c.setFillColor(HexColor('#0a0a0a'))
+    c.rect(0, 0, page_width, page_height, fill=1, stroke=0)
+    
+    # Decorative top line
+    c.setStrokeColor(HexColor('#6366f1'))
+    c.setLineWidth(3)
+    c.line(margin, page_height / 2 + 100, page_width - margin, page_height / 2 + 100)
+    
+    # Title
+    c.setFont("Helvetica-Bold", 52)
+    c.setFillColor(white)
+    title_text = event_doc['name']
+    title_width = c.stringWidth(title_text, "Helvetica-Bold", 52)
+    c.drawString((page_width - title_width) / 2, page_height / 2 + 30, title_text)
+    
+    # Subtitle
+    c.setFont("Helvetica", 18)
+    c.setFillColor(HexColor('#a78bfa'))
+    subtitle_text = "MEMORY ARCHIVE"
+    subtitle_width = c.stringWidth(subtitle_text, "Helvetica", 18)
+    c.drawString((page_width - subtitle_width) / 2, page_height / 2 - 10, subtitle_text)
+    
+    # Date
+    c.setFont("Helvetica", 14)
+    c.setFillColor(HexColor('#9ca3af'))
+    date_text = event_doc['date']
+    date_width = c.stringWidth(date_text, "Helvetica", 14)
+    c.drawString((page_width - date_width) / 2, page_height / 2 - 40, date_text)
+    
+    # Photo count badge
+    c.setFont("Helvetica-Bold", 12)
+    photo_count_text = f"{len(photos)} MOMENTS CAPTURED"
+    count_width = c.stringWidth(photo_count_text, "Helvetica-Bold", 12)
+    badge_x = (page_width - count_width) / 2 - 15
+    badge_y = page_height / 2 - 80
+    c.setFillColor(HexColor('#6366f1'))
+    c.roundRect(badge_x, badge_y, count_width + 30, 26, 13, fill=1, stroke=0)
+    c.setFillColor(white)
+    c.drawString(badge_x + 15, badge_y + 7, photo_count_text)
+    
+    # Decorative bottom line
+    c.setStrokeColor(HexColor('#6366f1'))
+    c.line(margin, page_height / 2 - 130, page_width - margin, page_height / 2 - 130)
+    c.showPage()
+    
+    # Photo pages - Scattered grid layout (2-3 photos per spread)
+    photos_per_page = 2
+    for i in range(0, len(photos), photos_per_page):
+        page_photos = photos[i:i + photos_per_page]
+        
+        # Dark background
+        c.setFillColor(HexColor('#111111'))
+        c.rect(0, 0, page_width, page_height, fill=1, stroke=0)
+        
+        for idx, photo in enumerate(page_photos):
+            try:
+                img, temp_path = fetch_and_prepare_image(r2_client, bucket_name, photo['s3_key'])
+                
+                # Calculate scattered positions
+                if len(page_photos) == 1:
+                    img_w = page_width * 0.7
+                    img_h = page_height * 0.75
+                    x = (page_width - img_w) / 2
+                    y = (page_height - img_h) / 2
+                else:
+                    img_w = page_width * 0.45
+                    img_h = page_height * 0.65
+                    if idx == 0:
+                        x = margin + 20
+                        y = page_height - img_h - margin - 30
+                    else:
+                        x = page_width - img_w - margin - 20
+                        y = margin + 50
+                
+                # Maintain aspect ratio
+                img_ratio = img.width / img.height
+                box_ratio = img_w / img_h
+                if img_ratio > box_ratio:
+                    display_w = img_w
+                    display_h = img_w / img_ratio
+                else:
+                    display_h = img_h
+                    display_w = img_h * img_ratio
+                
+                # Draw polaroid-style frame
+                frame_padding = 8
+                c.setFillColor(white)
+                c.rect(x - frame_padding, y - frame_padding - 25, 
+                       display_w + frame_padding * 2, display_h + frame_padding * 2 + 25, fill=1, stroke=0)
+                
+                c.drawImage(temp_path, x, y, width=display_w, height=display_h, preserveAspectRatio=True)
+                
+                # Photo number
+                c.setFont("Helvetica", 9)
+                c.setFillColor(HexColor('#666666'))
+                c.drawString(x, y - 18, f"#{i + idx + 1}")
+                
+                os.unlink(temp_path)
+            except Exception as e:
+                logger.error(f"Memory Archive - Failed to add photo: {e}")
+                continue
+        
+        # Page indicator
+        c.setFont("Helvetica", 9)
+        c.setFillColor(HexColor('#666666'))
+        page_num = f"{(i // photos_per_page) + 1}"
+        c.drawString(page_width - margin - 20, margin / 2, page_num)
+        c.showPage()
+    
+    # Closing page
+    c.setFillColor(HexColor('#0a0a0a'))
+    c.rect(0, 0, page_width, page_height, fill=1, stroke=0)
+    c.setFont("Helvetica-Bold", 36)
+    c.setFillColor(white)
+    end_text = "THE END"
+    end_width = c.stringWidth(end_text, "Helvetica-Bold", 36)
+    c.drawString((page_width - end_width) / 2, page_height / 2 + 10, end_text)
+    c.setFont("Helvetica", 14)
+    c.setFillColor(HexColor('#9ca3af'))
+    thanks_text = f"Thank you for being part of {event_doc['name']}"
+    thanks_width = c.stringWidth(thanks_text, "Helvetica", 14)
+    c.drawString((page_width - thanks_width) / 2, page_height / 2 - 25, thanks_text)
+    c.showPage()
+
+
+def generate_typography_collage_pdf(c, photos, event_doc, page_width, page_height, r2_client, bucket_name):
+    """Style 2: Typography Collage - Bold text overlay with artistic arrangement"""
+    margin = 30
+    
+    # Title Page - Vibrant yellow/gold theme
+    c.setFillColor(HexColor('#f59e0b'))
+    c.rect(0, 0, page_width, page_height, fill=1, stroke=0)
+    
+    # Large bold title
+    c.setFont("Helvetica-Bold", 72)
+    c.setFillColor(HexColor('#000000'))
+    title_text = event_doc['name'].upper()
+    title_width = c.stringWidth(title_text, "Helvetica-Bold", 72)
+    if title_width > page_width - 80:
+        c.setFont("Helvetica-Bold", 48)
+        title_width = c.stringWidth(title_text, "Helvetica-Bold", 48)
+    c.drawString((page_width - title_width) / 2, page_height / 2 + 40, title_text)
+    
+    # Decorative text elements
+    c.setFont("Helvetica-Bold", 120)
+    c.setFillColor(HexColor('#00000015'))
+    c.drawString(-30, page_height - 120, "MOMENTS")
+    c.drawString(page_width - 350, 30, "CAPTURED")
+    
+    # Date badge
+    c.setFont("Helvetica-Bold", 16)
+    c.setFillColor(HexColor('#000000'))
+    date_text = event_doc['date']
+    c.drawString((page_width - c.stringWidth(date_text, "Helvetica-Bold", 16)) / 2, page_height / 2 - 20, date_text)
+    
+    # Photo count
+    c.setFont("Helvetica", 14)
+    count_text = f"{len(photos)} photos"
+    c.drawString((page_width - c.stringWidth(count_text, "Helvetica", 14)) / 2, page_height / 2 - 50, count_text)
+    c.showPage()
+    
+    # Photo pages - Grid collage with text overlays
+    photos_per_page = 4
+    for i in range(0, len(photos), photos_per_page):
+        page_photos = photos[i:i + photos_per_page]
+        
+        # Alternating background colors
+        bg_colors = ['#fbbf24', '#f97316', '#ef4444', '#8b5cf6']
+        bg_color = bg_colors[(i // photos_per_page) % len(bg_colors)]
+        c.setFillColor(HexColor(bg_color))
+        c.rect(0, 0, page_width, page_height, fill=1, stroke=0)
+        
+        # Grid positions for up to 4 photos
+        positions = [
+            (margin, page_height / 2 + 20, (page_width - margin * 3) / 2, (page_height - margin * 3) / 2 - 20),
+            (page_width / 2 + margin / 2, page_height / 2 + 20, (page_width - margin * 3) / 2, (page_height - margin * 3) / 2 - 20),
+            (margin, margin + 30, (page_width - margin * 3) / 2, (page_height - margin * 3) / 2 - 20),
+            (page_width / 2 + margin / 2, margin + 30, (page_width - margin * 3) / 2, (page_height - margin * 3) / 2 - 20),
+        ]
+        
+        for idx, photo in enumerate(page_photos):
+            if idx >= len(positions):
+                break
+            try:
+                img, temp_path = fetch_and_prepare_image(r2_client, bucket_name, photo['s3_key'])
+                x, y, w, h = positions[idx]
+                
+                # Aspect ratio calculation
+                img_ratio = img.width / img.height
+                box_ratio = w / h
+                if img_ratio > box_ratio:
+                    display_w = w
+                    display_h = w / img_ratio
+                    y = y + (h - display_h) / 2
+                else:
+                    display_h = h
+                    display_w = h * img_ratio
+                    x = x + (w - display_w) / 2
+                
+                # White border effect
+                border = 4
+                c.setFillColor(white)
+                c.rect(x - border, y - border, display_w + border * 2, display_h + border * 2, fill=1, stroke=0)
+                
+                c.drawImage(temp_path, x, y, width=display_w, height=display_h, preserveAspectRatio=True)
+                os.unlink(temp_path)
+            except Exception as e:
+                logger.error(f"Typography Collage - Failed to add photo: {e}")
+                continue
+        
+        # Bold typography overlay
+        c.setFont("Helvetica-Bold", 100)
+        c.setFillColor(HexColor('#00000020'))
+        overlay_texts = ["LOVE", "JOY", "LIFE", "FUN", "EPIC", "WOW"]
+        overlay_text = overlay_texts[(i // photos_per_page) % len(overlay_texts)]
+        c.drawString(margin, page_height - 90, overlay_text)
+        
+        # Page number
+        c.setFont("Helvetica-Bold", 12)
+        c.setFillColor(HexColor('#000000'))
+        c.drawString(page_width - margin - 30, margin / 2, f"{(i // photos_per_page) + 1}")
+        c.showPage()
+    
+    # Closing page
+    c.setFillColor(HexColor('#000000'))
+    c.rect(0, 0, page_width, page_height, fill=1, stroke=0)
+    c.setFont("Helvetica-Bold", 64)
+    c.setFillColor(HexColor('#f59e0b'))
+    end_text = "FIN."
+    end_width = c.stringWidth(end_text, "Helvetica-Bold", 64)
+    c.drawString((page_width - end_width) / 2, page_height / 2 + 20, end_text)
+    c.setFont("Helvetica", 16)
+    c.setFillColor(white)
+    thanks_text = event_doc['name']
+    thanks_width = c.stringWidth(thanks_text, "Helvetica", 16)
+    c.drawString((page_width - thanks_width) / 2, page_height / 2 - 30, thanks_text)
+    c.showPage()
+
+
+def generate_minimalist_story_pdf(c, photos, event_doc, page_width, page_height, r2_client, bucket_name):
+    """Style 3: Minimalist Story - Clean Instagram-style with organized layout"""
+    margin = 50
+    
+    # Title Page - Clean white with accent
+    c.setFillColor(white)
+    c.rect(0, 0, page_width, page_height, fill=1, stroke=0)
+    
+    # Thin accent line at top
+    c.setStrokeColor(HexColor('#000000'))
+    c.setLineWidth(1)
+    c.line(margin, page_height - margin, page_width - margin, page_height - margin)
+    
+    # Clean title
+    c.setFont("Helvetica", 42)
+    c.setFillColor(HexColor('#1a1a1a'))
+    title_text = event_doc['name']
+    title_width = c.stringWidth(title_text, "Helvetica", 42)
+    c.drawString((page_width - title_width) / 2, page_height / 2 + 30, title_text)
+    
+    # Minimal date
+    c.setFont("Helvetica", 14)
+    c.setFillColor(HexColor('#666666'))
+    date_text = event_doc['date']
+    date_width = c.stringWidth(date_text, "Helvetica", 14)
+    c.drawString((page_width - date_width) / 2, page_height / 2 - 10, date_text)
+    
+    # Story dots (like Instagram stories)
+    dot_y = page_height / 2 - 50
+    dot_spacing = 12
+    total_dots = min(len(photos), 10)
+    start_x = (page_width - (total_dots * dot_spacing)) / 2
+    for d in range(total_dots):
+        c.setFillColor(HexColor('#e5e7eb'))
+        c.circle(start_x + d * dot_spacing, dot_y, 3, fill=1, stroke=0)
+    
+    # Accent line at bottom
+    c.line(margin, margin, page_width - margin, margin)
+    
+    # Photo count in corner
+    c.setFont("Helvetica", 10)
+    c.setFillColor(HexColor('#999999'))
+    c.drawString(margin, margin - 15, f"{len(photos)} moments")
+    c.showPage()
+    
+    # Photo pages - One large photo per page, Instagram story style
+    for idx, photo in enumerate(photos):
+        # White background
+        c.setFillColor(white)
+        c.rect(0, 0, page_width, page_height, fill=1, stroke=0)
+        
+        try:
+            img, temp_path = fetch_and_prepare_image(r2_client, bucket_name, photo['s3_key'])
+            
+            # Large centered image with generous margins
+            img_margin = 60
+            max_w = page_width - img_margin * 2
+            max_h = page_height - img_margin * 2 - 40  # Space for progress bar
+            
+            img_ratio = img.width / img.height
+            box_ratio = max_w / max_h
+            
+            if img_ratio > box_ratio:
+                display_w = max_w
+                display_h = max_w / img_ratio
+            else:
+                display_h = max_h
+                display_w = max_h * img_ratio
+            
+            x = (page_width - display_w) / 2
+            y = (page_height - display_h) / 2 + 10
+            
+            c.drawImage(temp_path, x, y, width=display_w, height=display_h, preserveAspectRatio=True)
+            
+            # Progress bar at top (Instagram stories style)
+            bar_y = page_height - 30
+            bar_height = 3
+            total_width = page_width - margin * 2
+            segment_width = (total_width - (len(photos) - 1) * 4) / len(photos)
+            
+            for bar_idx in range(len(photos)):
+                bar_x = margin + bar_idx * (segment_width + 4)
+                if bar_idx <= idx:
+                    c.setFillColor(HexColor('#1a1a1a'))
+                else:
+                    c.setFillColor(HexColor('#e5e7eb'))
+                c.roundRect(bar_x, bar_y, segment_width, bar_height, 1.5, fill=1, stroke=0)
+            
+            # Minimal page counter
+            c.setFont("Helvetica", 10)
+            c.setFillColor(HexColor('#999999'))
+            counter_text = f"{idx + 1} / {len(photos)}"
+            counter_width = c.stringWidth(counter_text, "Helvetica", 10)
+            c.drawString((page_width - counter_width) / 2, 25, counter_text)
+            
+            os.unlink(temp_path)
+        except Exception as e:
+            logger.error(f"Minimalist Story - Failed to add photo: {e}")
+        
+        c.showPage()
+    
+    # Closing page - Simple and clean
+    c.setFillColor(white)
+    c.rect(0, 0, page_width, page_height, fill=1, stroke=0)
+    
+    c.setFont("Helvetica", 28)
+    c.setFillColor(HexColor('#1a1a1a'))
+    end_text = "The End"
+    end_width = c.stringWidth(end_text, "Helvetica", 28)
+    c.drawString((page_width - end_width) / 2, page_height / 2 + 20, end_text)
+    
+    c.setFont("Helvetica", 12)
+    c.setFillColor(HexColor('#999999'))
+    thanks_text = f"Thanks for viewing {event_doc['name']}"
+    thanks_width = c.stringWidth(thanks_text, "Helvetica", 12)
+    c.drawString((page_width - thanks_width) / 2, page_height / 2 - 15, thanks_text)
+    
+    # Final dot
+    c.setFillColor(HexColor('#1a1a1a'))
+    c.circle(page_width / 2, page_height / 2 - 50, 4, fill=1, stroke=0)
+    c.showPage()
+
+
 @api_router.post("/events/{event_id}/create-flipbook")
 async def create_flipbook(event_id: str, current_user: User = Depends(get_current_user)):
     event_doc = await db.events.find_one(
