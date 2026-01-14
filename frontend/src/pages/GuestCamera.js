@@ -2,25 +2,20 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import FingerprintJS from '@fingerprintjs/fingerprintjs';
-import { Camera as CameraIcon, SwitchCamera, Zap, ZapOff, X } from 'lucide-react';
+import { Camera as CameraIcon, SwitchCamera, Zap, ZapOff } from 'lucide-react';
 import { toast } from 'sonner';
+import { applyFilter, getPreviewFilter, PREMIUM_FILTERS } from '@/utils/filters';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
-
-const FILTERS = {
-  warm: 'brightness(1.1) contrast(1.05) saturate(1.2) sepia(0.15)',
-  party: 'brightness(1.15) contrast(1.2) saturate(1.4) hue-rotate(5deg)',
-  wedding: 'brightness(1.05) contrast(0.95) saturate(0.9) blur(0.3px)',
-  corporate: 'brightness(1.05) contrast(1.1) saturate(0.8) grayscale(0.1)',
-  vintage: 'brightness(0.95) contrast(1.15) saturate(0.8) sepia(0.3)'
-};
 
 const GuestCamera = () => {
   const { shareUrl } = useParams();
   const navigate = useNavigate();
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
+  const previewCanvasRef = useRef(null);
   const streamRef = useRef(null);
+  const animationRef = useRef(null);
   
   const [event, setEvent] = useState(null);
   const [deviceId, setDeviceId] = useState(null);
@@ -30,6 +25,7 @@ const GuestCamera = () => {
   const [capturing, setCapturing] = useState(false);
   const [showFlash, setShowFlash] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [useAdvancedPreview, setUseAdvancedPreview] = useState(false);
 
   useEffect(() => {
     initializeCamera();
@@ -37,8 +33,47 @@ const GuestCamera = () => {
       if (streamRef.current) {
         streamRef.current.getTracks().forEach(track => track.stop());
       }
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+      }
     };
   }, [shareUrl, facingMode]);
+
+  // Start real-time filter preview when event loads
+  useEffect(() => {
+    if (event && videoRef.current && previewCanvasRef.current && useAdvancedPreview) {
+      startFilterPreview();
+    }
+    return () => {
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+      }
+    };
+  }, [event, useAdvancedPreview]);
+
+  const startFilterPreview = () => {
+    const video = videoRef.current;
+    const previewCanvas = previewCanvasRef.current;
+    if (!video || !previewCanvas || !event) return;
+
+    const ctx = previewCanvas.getContext('2d');
+    
+    const renderFrame = () => {
+      if (video.readyState >= 2) {
+        previewCanvas.width = video.videoWidth;
+        previewCanvas.height = video.videoHeight;
+        
+        // Draw video frame
+        ctx.drawImage(video, 0, 0);
+        
+        // Apply premium filter
+        applyFilter(ctx, previewCanvas, event.filter_type);
+      }
+      animationRef.current = requestAnimationFrame(renderFrame);
+    };
+    
+    renderFrame();
+  };
 
   const initializeCamera = async () => {
     try {
@@ -85,6 +120,9 @@ const GuestCamera = () => {
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(track => track.stop());
     }
+    if (animationRef.current) {
+      cancelAnimationFrame(animationRef.current);
+    }
     setFacingMode(facingMode === 'environment' ? 'user' : 'environment');
   };
 
@@ -103,8 +141,12 @@ const GuestCamera = () => {
       canvas.height = video.videoHeight;
       
       const ctx = canvas.getContext('2d');
-      ctx.filter = FILTERS[event.filter_type] || FILTERS.warm;
+      
+      // Draw video frame first
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      
+      // Apply premium filter (baked into the image)
+      applyFilter(ctx, canvas, event.filter_type);
 
       canvas.toBlob(async (blob) => {
         try {
@@ -177,6 +219,21 @@ const GuestCamera = () => {
     }
   };
 
+  // Get filter info for display
+  const getFilterInfo = () => {
+    if (!event) return { name: 'Loading...', category: '' };
+    const filter = PREMIUM_FILTERS[event.filter_type];
+    if (filter) {
+      return {
+        name: filter.name,
+        category: filter.category === 'wedding' ? '💍 Wedding' : '✨ Premium'
+      };
+    }
+    return { name: event.filter_type, category: '' };
+  };
+
+  const filterInfo = getFilterInfo();
+
   if (loading || !event) {
     return (
       <div className="fixed inset-0 bg-black flex items-center justify-center">
@@ -190,23 +247,37 @@ const GuestCamera = () => {
 
   return (
     <div className="fixed inset-0 bg-black overflow-hidden" data-testid="guest-camera">
+      {/* Video element - hidden when using advanced preview */}
       <video
         ref={videoRef}
         autoPlay
         playsInline
         muted
-        className="absolute inset-0 w-full h-full object-cover -z-10"
-        style={{ filter: FILTERS[event.filter_type] || FILTERS.warm }}
+        className={`absolute inset-0 w-full h-full object-cover ${useAdvancedPreview ? 'hidden' : ''}`}
+        style={{ filter: getPreviewFilter(event.filter_type) }}
         data-testid="camera-video"
       />
       
+      {/* Advanced preview canvas - shows real filter effect */}
+      {useAdvancedPreview && (
+        <canvas
+          ref={previewCanvasRef}
+          className="absolute inset-0 w-full h-full object-cover"
+          data-testid="preview-canvas"
+        />
+      )}
+      
+      {/* Capture canvas (hidden) */}
       <canvas ref={canvasRef} className="hidden" />
 
+      {/* Flash effect */}
       {showFlash && (
         <div className="absolute inset-0 bg-white flash-effect z-50" />
       )}
 
+      {/* UI Overlay */}
       <div className="absolute inset-0 z-10 flex flex-col">
+        {/* Header */}
         <div className="glass p-4 m-4 rounded-2xl flex items-center justify-between">
           <div className="flex items-center gap-3">
             {event.logo_url && (
@@ -218,7 +289,9 @@ const GuestCamera = () => {
             )}
             <div>
               <h2 className="font-bold text-white">{event.name}</h2>
-              <p className="text-xs text-white/70">Tap to capture memories</p>
+              <p className="text-xs text-white/70">
+                {filterInfo.category} <span className="text-primary">{filterInfo.name}</span> filter
+              </p>
             </div>
           </div>
           <div className="mono text-white font-semibold text-lg" data-testid="photo-counter">
@@ -228,6 +301,7 @@ const GuestCamera = () => {
 
         <div className="flex-1" />
 
+        {/* Controls */}
         <div className="p-8 flex items-center justify-between">
           <button
             onClick={switchCamera}
@@ -259,6 +333,7 @@ const GuestCamera = () => {
           </button>
         </div>
 
+        {/* Footer */}
         <div className="text-center pb-6 text-white/70 text-sm">
           {photoCount.remaining > 0 ? (
             <p>You can take {photoCount.remaining} more photo{photoCount.remaining !== 1 ? 's' : ''}</p>
