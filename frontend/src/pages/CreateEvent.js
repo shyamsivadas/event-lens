@@ -1,10 +1,55 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Sparkles, Heart } from 'lucide-react';
 import { toast } from 'sonner';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
+
+// Premium Filter Pack definitions
+const PREMIUM_FILTERS = [
+  { id: 'luxury', name: 'Luxury', description: 'Rich, glossy, high-end', target: 'Vogue, Dior, premium films', gradient: 'from-amber-900 via-yellow-800 to-amber-900' },
+  { id: 'night', name: 'Night', description: 'Dark parties, concerts', target: 'Club photography, nightlife', gradient: 'from-blue-900 via-purple-900 to-indigo-900' },
+  { id: 'pastel', name: 'Pastel', description: 'Soft, airy, Instagram-ready', target: 'Lifestyle, baby showers', gradient: 'from-pink-200 via-purple-200 to-blue-200' },
+  { id: 'film', name: 'Film', description: 'Analog, nostalgic feel', target: 'Kodak, Fuji film look', gradient: 'from-orange-800 via-amber-700 to-yellow-600' },
+  { id: 'editorial', name: 'Editorial', description: 'Sharp, dramatic, magazine', target: 'Fashion shoots, covers', gradient: 'from-gray-900 via-gray-800 to-gray-700' },
+];
+
+// Wedding Look Pack definitions
+const WEDDING_FILTERS = [
+  { id: 'romance', name: 'Romance', description: 'Warm, glowing love', target: 'Close-ups, couples, smiles', gradient: 'from-rose-400 via-pink-400 to-red-300' },
+  { id: 'royal', name: 'Royal', description: 'Grand, cinematic look', target: 'Mandap, decor, bridal entry', gradient: 'from-yellow-600 via-amber-500 to-orange-500' },
+  { id: 'pure', name: 'Pure', description: 'Clean, white-dress friendly', target: 'Wedding dresses, stage', gradient: 'from-white via-gray-100 to-gray-200' },
+  { id: 'candle', name: 'Candle', description: 'Night wedding warmth', target: 'Haldi, mehndi, reception', gradient: 'from-orange-500 via-amber-400 to-yellow-300' },
+  { id: 'memory', name: 'Memory', description: 'Soft nostalgic moments', target: 'Emotional, timeless', gradient: 'from-amber-200 via-yellow-100 to-orange-100' },
+];
+
+const FilterCard = ({ filter, isSelected, onSelect, category }) => (
+  <div
+    onClick={onSelect}
+    data-testid={`filter-${filter.id}`}
+    className={`cursor-pointer rounded-xl border-2 transition-all duration-300 overflow-hidden ${
+      isSelected
+        ? 'border-primary ring-2 ring-primary/30 scale-[1.02]'
+        : 'border-border hover:border-primary/50 hover:scale-[1.01]'
+    }`}
+  >
+    <div className={`h-20 bg-gradient-to-br ${filter.gradient} relative`}>
+      {isSelected && (
+        <div className="absolute top-2 right-2 bg-primary rounded-full p-1">
+          <Sparkles className="w-3 h-3 text-white" />
+        </div>
+      )}
+      <div className="absolute bottom-2 left-2 text-xs font-medium px-2 py-0.5 rounded-full bg-black/30 text-white backdrop-blur-sm">
+        {filter.name}
+      </div>
+    </div>
+    <div className="p-3 bg-surface">
+      <p className="text-xs text-muted-foreground">{filter.description}</p>
+      <p className="text-[10px] text-muted-foreground/70 mt-1">{filter.target}</p>
+    </div>
+  </div>
+);
 
 const CreateEvent = () => {
   const navigate = useNavigate();
@@ -12,7 +57,7 @@ const CreateEvent = () => {
     name: '',
     date: '',
     logo_url: '',
-    filter_type: 'warm',
+    filter_type: 'luxury',
     max_photos: 5,
     flipbook_style: 'memory_archive'
   });
@@ -46,7 +91,7 @@ const CreateEvent = () => {
   return (
     <div className="min-h-screen bg-background">
       <nav className="glass border-b border-border">
-        <div className="max-w-3xl mx-auto px-6 py-4 flex items-center gap-4">
+        <div className="max-w-4xl mx-auto px-6 py-4 flex items-center gap-4">
           <button
             onClick={() => navigate('/dashboard')}
             className="text-muted-foreground hover:text-foreground transition-colors"
@@ -57,75 +102,103 @@ const CreateEvent = () => {
         </div>
       </nav>
 
-      <div className="max-w-3xl mx-auto px-6 py-12">
+      <div className="max-w-4xl mx-auto px-6 py-12">
         <div className="glass rounded-2xl p-8">
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div>
-              <label className="block text-sm font-medium mb-2">Event Name *</label>
-              <input
-                type="text"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                className="w-full bg-[#1a1a1a] px-4 py-3 rounded-lg border border-border focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-colors text-white placeholder:text-gray-500"
-                placeholder="My Awesome Event"
-                data-testid="event-name-input"
-              />
+          <form onSubmit={handleSubmit} className="space-y-8">
+            {/* Basic Info Section */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-sm font-medium mb-2">Event Name *</label>
+                <input
+                  type="text"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  className="w-full bg-[#1a1a1a] px-4 py-3 rounded-lg border border-border focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-colors text-white placeholder:text-gray-500"
+                  placeholder="My Awesome Event"
+                  data-testid="event-name-input"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">Event Date *</label>
+                <input
+                  type="date"
+                  value={formData.date}
+                  onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                  className="w-full bg-[#1a1a1a] px-4 py-3 rounded-lg border border-border focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-colors text-white [color-scheme:dark]"
+                  data-testid="event-date-input"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">Logo URL (optional)</label>
+                <input
+                  type="url"
+                  value={formData.logo_url}
+                  onChange={(e) => setFormData({ ...formData, logo_url: e.target.value })}
+                  className="w-full bg-[#1a1a1a] px-4 py-3 rounded-lg border border-border focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-colors text-white placeholder:text-gray-500"
+                  placeholder="https://example.com/logo.png"
+                  data-testid="event-logo-input"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">Max Photos Per Guest</label>
+                <input
+                  type="number"
+                  value={formData.max_photos}
+                  onChange={(e) => setFormData({ ...formData, max_photos: parseInt(e.target.value) })}
+                  min="1"
+                  max="20"
+                  className="w-full bg-[#1a1a1a] px-4 py-3 rounded-lg border border-border focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-colors text-white"
+                  data-testid="max-photos-input"
+                />
+              </div>
             </div>
 
+            {/* Premium Filter Pack Section */}
             <div>
-              <label className="block text-sm font-medium mb-2">Event Date *</label>
-              <input
-                type="date"
-                value={formData.date}
-                onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-                className="w-full bg-[#1a1a1a] px-4 py-3 rounded-lg border border-border focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-colors text-white [color-scheme:dark]"
-                data-testid="event-date-input"
-              />
+              <div className="flex items-center gap-2 mb-4">
+                <Sparkles className="w-5 h-5 text-primary" />
+                <label className="text-sm font-semibold">Premium Filter Pack</label>
+                <span className="text-xs text-muted-foreground">— Cinematic camera looks</span>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
+                {PREMIUM_FILTERS.map((filter) => (
+                  <FilterCard
+                    key={filter.id}
+                    filter={filter}
+                    isSelected={formData.filter_type === filter.id}
+                    onSelect={() => setFormData({ ...formData, filter_type: filter.id })}
+                    category="premium"
+                  />
+                ))}
+              </div>
             </div>
 
+            {/* Wedding Look Pack Section */}
             <div>
-              <label className="block text-sm font-medium mb-2">Logo URL (optional)</label>
-              <input
-                type="url"
-                value={formData.logo_url}
-                onChange={(e) => setFormData({ ...formData, logo_url: e.target.value })}
-                className="w-full bg-[#1a1a1a] px-4 py-3 rounded-lg border border-border focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-colors text-white placeholder:text-gray-500"
-                placeholder="https://example.com/logo.png"
-                data-testid="event-logo-input"
-              />
+              <div className="flex items-center gap-2 mb-4">
+                <Heart className="w-5 h-5 text-rose-400" />
+                <label className="text-sm font-semibold">Wedding Look Pack</label>
+                <span className="text-xs text-muted-foreground">— Optimized for skin tones & dresses</span>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
+                {WEDDING_FILTERS.map((filter) => (
+                  <FilterCard
+                    key={filter.id}
+                    filter={filter}
+                    isSelected={formData.filter_type === filter.id}
+                    onSelect={() => setFormData({ ...formData, filter_type: filter.id })}
+                    category="wedding"
+                  />
+                ))}
+              </div>
             </div>
 
+            {/* Flipbook Style Section */}
             <div>
-              <label className="block text-sm font-medium mb-2">Visual Filter</label>
-              <select
-                value={formData.filter_type}
-                onChange={(e) => setFormData({ ...formData, filter_type: e.target.value })}
-                className="w-full bg-[#1a1a1a] px-4 py-3 rounded-lg border border-border focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-colors text-white"
-                data-testid="filter-select"
-              >
-                <option value="warm">Warm</option>
-                <option value="party">Party</option>
-                <option value="wedding">Wedding Soft</option>
-                <option value="corporate">Corporate Clean</option>
-                <option value="vintage">Vintage</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-2">Max Photos Per Guest</label>
-              <input
-                type="number"
-                value={formData.max_photos}
-                onChange={(e) => setFormData({ ...formData, max_photos: parseInt(e.target.value) })}
-                min="1"
-                max="20"
-                className="w-full bg-[#1a1a1a] px-4 py-3 rounded-lg border border-border focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-colors text-white"
-                data-testid="max-photos-input"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-3">Flipbook Gallery Style</label>
+              <label className="block text-sm font-semibold mb-4">Flipbook Gallery Style</label>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {/* Memory Archive Style */}
                 <div
@@ -208,7 +281,7 @@ const CreateEvent = () => {
             <button
               type="submit"
               disabled={creating}
-              className="btn-primary w-full"
+              className="btn-primary w-full py-4 text-lg"
               data-testid="create-event-submit-btn"
             >
               {creating ? 'Creating...' : 'Create Event'}
