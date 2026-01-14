@@ -4,7 +4,6 @@ import axios from 'axios';
 import FingerprintJS from '@fingerprintjs/fingerprintjs';
 import { SwitchCamera, Zap, ZapOff, MessageSquare, X, Send } from 'lucide-react';
 import { toast } from 'sonner';
-import { applyFilter, getPreviewFilter, PREMIUM_FILTERS } from '@/utils/filters';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 
@@ -13,9 +12,7 @@ const GuestCamera = () => {
   const navigate = useNavigate();
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
-  const previewCanvasRef = useRef(null);
   const streamRef = useRef(null);
-  const animationRef = useRef(null);
   
   const [event, setEvent] = useState(null);
   const [deviceId, setDeviceId] = useState(null);
@@ -25,7 +22,6 @@ const GuestCamera = () => {
   const [capturing, setCapturing] = useState(false);
   const [showFlash, setShowFlash] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [useAdvancedPreview, setUseAdvancedPreview] = useState(false);
   
   // Notes feature
   const [showNoteInput, setShowNoteInput] = useState(false);
@@ -38,43 +34,8 @@ const GuestCamera = () => {
       if (streamRef.current) {
         streamRef.current.getTracks().forEach(track => track.stop());
       }
-      if (animationRef.current) {
-        cancelAnimationFrame(animationRef.current);
-      }
     };
   }, [shareUrl, facingMode]);
-
-  // Start real-time filter preview when event loads
-  useEffect(() => {
-    if (event && videoRef.current && previewCanvasRef.current && useAdvancedPreview) {
-      startFilterPreview();
-    }
-    return () => {
-      if (animationRef.current) {
-        cancelAnimationFrame(animationRef.current);
-      }
-    };
-  }, [event, useAdvancedPreview]);
-
-  const startFilterPreview = () => {
-    const video = videoRef.current;
-    const previewCanvas = previewCanvasRef.current;
-    if (!video || !previewCanvas || !event) return;
-
-    const ctx = previewCanvas.getContext('2d');
-    
-    const renderFrame = () => {
-      if (video.readyState >= 2) {
-        previewCanvas.width = video.videoWidth;
-        previewCanvas.height = video.videoHeight;
-        ctx.drawImage(video, 0, 0);
-        applyFilter(ctx, previewCanvas, event.filter_type);
-      }
-      animationRef.current = requestAnimationFrame(renderFrame);
-    };
-    
-    renderFrame();
-  };
 
   const initializeCamera = async () => {
     try {
@@ -121,16 +82,13 @@ const GuestCamera = () => {
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(track => track.stop());
     }
-    if (animationRef.current) {
-      cancelAnimationFrame(animationRef.current);
-    }
     setFacingMode(facingMode === 'environment' ? 'user' : 'environment');
   };
 
   const capturePhoto = async () => {
     if (capturing || photoCount.remaining <= 0) return;
 
-    // Capture the image first
+    // Capture the image
     const video = videoRef.current;
     const canvas = canvasRef.current;
     
@@ -139,7 +97,6 @@ const GuestCamera = () => {
     
     const ctx = canvas.getContext('2d');
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-    applyFilter(ctx, canvas, event.filter_type);
 
     // Convert to blob and store for later upload
     canvas.toBlob((blob) => {
@@ -160,7 +117,6 @@ const GuestCamera = () => {
       const filename = `photo_${Date.now()}.jpg`;
       const photoNote = includeNote ? note.trim() : '';
       
-      console.log('Requesting presigned URL...');
       const urlResponse = await axios.post(
         `${BACKEND_URL}/api/guest/${shareUrl}/presigned-url`,
         {
@@ -171,17 +127,13 @@ const GuestCamera = () => {
         }
       );
 
-      console.log('Presigned URL received:', urlResponse.data);
       const presignedUrl = urlResponse.data.url;
 
-      console.log('Uploading to R2...');
       const uploadResponse = await axios.put(presignedUrl, pendingCapture, {
         headers: { 
           'Content-Type': 'image/jpeg'
         }
       });
-
-      console.log('Upload response:', uploadResponse.status);
 
       if (uploadResponse.status === 200) {
         await axios.post(
@@ -214,7 +166,7 @@ const GuestCamera = () => {
         throw new Error(`Upload failed with status ${uploadResponse.status}`);
       }
     } catch (error) {
-      console.error('Upload error details:', error);
+      console.error('Upload error:', error);
       const errorMsg = error.response?.data?.detail || error.message || 'Upload failed';
       toast.error(`Failed to upload photo: ${errorMsg}`);
     } finally {
@@ -227,21 +179,6 @@ const GuestCamera = () => {
     setNote('');
     setPendingCapture(null);
   };
-
-  // Get filter info for display
-  const getFilterInfo = () => {
-    if (!event) return { name: 'Loading...', category: '' };
-    const filter = PREMIUM_FILTERS[event.filter_type];
-    if (filter) {
-      return {
-        name: filter.name,
-        category: filter.category === 'wedding' ? '💍 Wedding' : '✨ Premium'
-      };
-    }
-    return { name: event.filter_type, category: '' };
-  };
-
-  const filterInfo = getFilterInfo();
 
   if (loading || !event) {
     return (
@@ -262,19 +199,9 @@ const GuestCamera = () => {
         autoPlay
         playsInline
         muted
-        className={`absolute inset-0 w-full h-full object-cover ${useAdvancedPreview ? 'hidden' : ''}`}
-        style={{ filter: getPreviewFilter(event.filter_type) }}
+        className="absolute inset-0 w-full h-full object-cover"
         data-testid="camera-video"
       />
-      
-      {/* Advanced preview canvas */}
-      {useAdvancedPreview && (
-        <canvas
-          ref={previewCanvasRef}
-          className="absolute inset-0 w-full h-full object-cover"
-          data-testid="preview-canvas"
-        />
-      )}
       
       {/* Capture canvas (hidden) */}
       <canvas ref={canvasRef} className="hidden" />
@@ -380,9 +307,7 @@ const GuestCamera = () => {
             )}
             <div>
               <h2 className="font-bold text-white">{event.name}</h2>
-              <p className="text-xs text-white/70">
-                {filterInfo.category} <span className="text-primary">{filterInfo.name}</span> filter
-              </p>
+              <p className="text-xs text-white/70">{event.date}</p>
             </div>
           </div>
           <div className="mono text-white font-semibold text-lg" data-testid="photo-counter">
