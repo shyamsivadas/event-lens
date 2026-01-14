@@ -13,7 +13,8 @@ const CreateEvent = () => {
     date: '',
     logo_url: '',
     filter_type: 'warm',
-    max_photos: 5
+    max_photos: 5,
+    flipbook_style: 'memory_archive'
   });
   const [creating, setCreating] = useState(false);
 
@@ -121,6 +122,84 @@ const CreateEvent = () => {
                 className="w-full bg-[#1a1a1a] px-4 py-3 rounded-lg border border-border focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-colors text-white"
                 data-testid="max-photos-input"
               />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-3">Flipbook Gallery Style</label>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {/* Memory Archive Style */}
+                <div
+                  onClick={() => setFormData({ ...formData, flipbook_style: 'memory_archive' })}
+                  className={`cursor-pointer rounded-lg border-2 transition-all p-4 ${
+                    formData.flipbook_style === 'memory_archive'
+                      ? 'border-primary bg-primary/10'
+                      : 'border-border hover:border-primary/50'
+                  }`}
+                >
+                  <div className="aspect-square bg-gradient-to-br from-gray-800 to-gray-900 rounded-lg mb-3 flex items-center justify-center overflow-hidden">
+                    <div className="grid grid-cols-3 gap-1 p-2 w-full h-full">
+                      <div className="bg-gray-600 rounded"></div>
+                      <div className="bg-gray-500 rounded col-span-2"></div>
+                      <div className="bg-gray-700 rounded row-span-2"></div>
+                      <div className="bg-gray-600 rounded"></div>
+                      <div className="bg-gray-500 rounded"></div>
+                      <div className="bg-gray-600 rounded"></div>
+                      <div className="bg-gray-500 rounded col-span-2"></div>
+                    </div>
+                  </div>
+                  <h4 className="font-semibold mb-1">Memory Archive</h4>
+                  <p className="text-xs text-muted-foreground">Documentary style with scattered grid layout</p>
+                </div>
+
+                {/* Typography Collage Style */}
+                <div
+                  onClick={() => setFormData({ ...formData, flipbook_style: 'typography_collage' })}
+                  className={`cursor-pointer rounded-lg border-2 transition-all p-4 ${
+                    formData.flipbook_style === 'typography_collage'
+                      ? 'border-primary bg-primary/10'
+                      : 'border-border hover:border-primary/50'
+                  }`}
+                >
+                  <div className="aspect-square bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-lg mb-3 flex items-center justify-center overflow-hidden relative">
+                    <div className="absolute inset-0 grid grid-cols-4 gap-1 p-2 opacity-40">
+                      {[...Array(12)].map((_, i) => (
+                        <div key={i} className="bg-black rounded"></div>
+                      ))}
+                    </div>
+                    <div className="relative text-black font-bold text-2xl">TYPE</div>
+                  </div>
+                  <h4 className="font-semibold mb-1">Typography Collage</h4>
+                  <p className="text-xs text-muted-foreground">Bold text overlay with artistic arrangement</p>
+                </div>
+
+                {/* Minimalist Story Style */}
+                <div
+                  onClick={() => setFormData({ ...formData, flipbook_style: 'minimalist_story' })}
+                  className={`cursor-pointer rounded-lg border-2 transition-all p-4 ${
+                    formData.flipbook_style === 'minimalist_story'
+                      ? 'border-primary bg-primary/10'
+                      : 'border-border hover:border-primary/50'
+                  }`}
+                >
+                  <div className="aspect-square bg-white rounded-lg mb-3 flex items-center justify-center overflow-hidden">
+                    <div className="w-full h-full p-3 flex flex-col">
+                      <div className="flex gap-1 mb-2">
+                        <div className="w-1/3 h-2 bg-gray-300 rounded"></div>
+                        <div className="w-1/3 h-2 bg-gray-300 rounded"></div>
+                        <div className="w-1/3 h-2 bg-gray-300 rounded"></div>
+                      </div>
+                      <div className="flex-1 grid grid-cols-3 gap-1">
+                        {[...Array(9)].map((_, i) => (
+                          <div key={i} className="bg-gray-200 rounded"></div>
+                        ))}
+                      </div>
+                      <div className="h-3 bg-gray-800 rounded mt-2"></div>
+                    </div>
+                  </div>
+                  <h4 className="font-semibold mb-1">Minimalist Story</h4>
+                  <p className="text-xs text-muted-foreground">Clean Instagram-style with organized layout</p>
+                </div>
+              </div>
             </div>
 
             <button
