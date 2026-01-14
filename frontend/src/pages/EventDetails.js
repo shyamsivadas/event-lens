@@ -282,8 +282,7 @@ const EventDetails = () => {
           ) : (
             <PhotoGallery 
               photos={photos} 
-              eventName={event.name} 
-              galleryStyle={event.flipbook_style || 'memory_archive'}
+              eventName={event.name}
             />
           )}
         </div>
