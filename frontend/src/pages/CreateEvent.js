@@ -155,6 +155,7 @@ const CreateEvent = () => {
                 {/* Typography Collage Style */}
                 <div
                   onClick={() => setFormData({ ...formData, flipbook_style: 'typography_collage' })}
+                  data-testid="flipbook-style-typography-collage"
                   className={`cursor-pointer rounded-lg border-2 transition-all p-4 ${
                     formData.flipbook_style === 'typography_collage'
                       ? 'border-primary bg-primary/10'
