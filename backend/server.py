@@ -503,7 +503,12 @@ async def create_flipbook(event_id: str, current_user: User = Depends(get_curren
         
         if heyzine_response.status_code == 200:
             flipbook_data = heyzine_response.json()
-            flipbook_url = flipbook_data.get('url')
+            logger.info(f"Heyzine response: {flipbook_data}")
+            flipbook_url = flipbook_data.get('url') or flipbook_data.get('link')
+            
+            if not flipbook_url:
+                logger.error(f"No URL in Heyzine response: {flipbook_data}")
+                raise HTTPException(status_code=500, detail="Heyzine did not return a flipbook URL")
             
             await db.events.update_one(
                 {"event_id": event_id},
@@ -518,7 +523,7 @@ async def create_flipbook(event_id: str, current_user: User = Depends(get_curren
                 "message": "Flipbook created successfully"
             }
         else:
-            logger.error(f"Heyzine API error: {heyzine_response.text}")
+            logger.error(f"Heyzine API error: Status {heyzine_response.status_code}, Response: {heyzine_response.text}")
             raise HTTPException(status_code=500, detail=f"Failed to create flipbook: {heyzine_response.text}")
     
     except Exception as e:
