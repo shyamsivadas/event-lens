@@ -417,14 +417,35 @@ async def create_flipbook(event_id: str, current_user: User = Depends(get_curren
             c = canvas.Canvas(pdf_path, pagesize=landscape(A4))
             page_width, page_height = landscape(A4)
             
-            photos_per_page = 4
-            margin = 20
-            spacing = 10
+            # Magazine-style layout: 2 photos per page (larger, more professional)
+            photos_per_page = 2
+            margin = 30
+            spacing = 20
             
             cols = 2
-            rows = 2
+            rows = 1
             img_width = (page_width - 2 * margin - spacing) / cols
-            img_height = (page_height - 2 * margin - spacing) / rows
+            img_height = page_height - 2 * margin
+            
+            # Add a stylish title page
+            c.setFont("Helvetica-Bold", 36)
+            c.setFillColorRGB(0.1, 0.1, 0.1)
+            title_text = event_doc['name']
+            title_width = c.stringWidth(title_text, "Helvetica-Bold", 36)
+            c.drawString((page_width - title_width) / 2, page_height / 2 + 30, title_text)
+            
+            c.setFont("Helvetica", 18)
+            c.setFillColorRGB(0.4, 0.4, 0.4)
+            subtitle_text = f"Event Date: {event_doc['date']}"
+            subtitle_width = c.stringWidth(subtitle_text, "Helvetica", 18)
+            c.drawString((page_width - subtitle_width) / 2, page_height / 2 - 10, subtitle_text)
+            
+            c.setFont("Helvetica", 14)
+            photo_count_text = f"{len(photos)} Beautiful Memories"
+            count_width = c.stringWidth(photo_count_text, "Helvetica", 14)
+            c.drawString((page_width - count_width) / 2, page_height / 2 - 40, photo_count_text)
+            
+            c.showPage()
             
             for idx, photo in enumerate(photos):
                 if idx > 0 and idx % photos_per_page == 0:
@@ -435,7 +456,7 @@ async def create_flipbook(event_id: str, current_user: User = Depends(get_curren
                 row = position // cols
                 
                 x = margin + col * (img_width + spacing)
-                y = page_height - margin - (row + 1) * img_height - row * spacing
+                y = margin
                 
                 try:
                     response = r2_client.get_object(
