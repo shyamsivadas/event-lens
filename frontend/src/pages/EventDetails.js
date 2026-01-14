@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { QRCode } from 'react-qrcode-logo';
-import { ArrowLeft, Share2, Download, Copy, Check, Image as ImageIcon, Trash2, Sparkles } from 'lucide-react';
+import { ArrowLeft, Share2, Download, Copy, Check, Image as ImageIcon, Trash2, Sparkles, BookOpen, ExternalLink } from 'lucide-react';
 import { toast } from 'sonner';
 import PhotoGallery from '@/components/PhotoGallery';
 
@@ -16,6 +16,7 @@ const EventDetails = () => {
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [creatingFlipbook, setCreatingFlipbook] = useState(false);
 
   useEffect(() => {
     loadEvent();
@@ -79,6 +80,32 @@ const EventDetails = () => {
       navigate('/dashboard');
     } catch (error) {
       toast.error('Failed to delete event');
+    }
+  };
+
+  const createFlipbook = async () => {
+    if (photos.length === 0) {
+      toast.error('No photos to create flipbook');
+      return;
+    }
+
+    setCreatingFlipbook(true);
+    toast.info('Creating flipbook... This may take a minute');
+
+    try {
+      const response = await axios.post(
+        `${BACKEND_URL}/api/events/${eventId}/create-flipbook`,
+        {},
+        { withCredentials: true }
+      );
+
+      toast.success('Flipbook created successfully!');
+      await loadEvent();
+    } catch (error) {
+      console.error('Flipbook error:', error);
+      toast.error(error.response?.data?.detail || 'Failed to create flipbook');
+    } finally {
+      setCreatingFlipbook(false);
     }
   };
 
@@ -179,13 +206,37 @@ const EventDetails = () => {
               <Sparkles className="w-6 h-6 text-primary" />
               Professional Gallery ({photos.length})
             </h2>
-            <button
-              onClick={() => loadPhotos()}
-              disabled={refreshing}
-              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-            >
-              {refreshing ? 'Refreshing...' : 'Refresh'}
-            </button>
+            <div className="flex items-center gap-2">
+              {event.flipbook_url && (
+                <a
+                  href={event.flipbook_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn-primary flex items-center gap-2"
+                  data-testid="view-flipbook-btn"
+                >
+                  <BookOpen className="w-4 h-4" />
+                  View Flipbook
+                  <ExternalLink className="w-3 h-3" />
+                </a>
+              )}
+              <button
+                onClick={createFlipbook}
+                disabled={creatingFlipbook || photos.length === 0}
+                className="btn-primary flex items-center gap-2"
+                data-testid="create-flipbook-btn"
+              >
+                <BookOpen className="w-4 h-4" />
+                {creatingFlipbook ? 'Creating...' : event.flipbook_url ? 'Recreate Flipbook' : 'Create Flipbook'}
+              </button>
+              <button
+                onClick={() => loadPhotos()}
+                disabled={refreshing}
+                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+              >
+                {refreshing ? 'Refreshing...' : 'Refresh'}
+              </button>
+            </div>
           </div>
           
           {photos.length === 0 ? (
