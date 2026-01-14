@@ -257,6 +257,24 @@ async def get_event_photos(event_id: str, current_user: User = Depends(get_curre
         {"_id": 0}
     ).to_list(10000)
     
+    r2_client = get_r2_client()
+    if r2_client:
+        bucket_name = os.getenv('R2_BUCKET_NAME', 'event-photos')
+        for photo in photos:
+            try:
+                presigned_url = r2_client.generate_presigned_url(
+                    ClientMethod='get_object',
+                    Params={
+                        'Bucket': bucket_name,
+                        'Key': photo['s3_key']
+                    },
+                    ExpiresIn=3600
+                )
+                photo['download_url'] = presigned_url
+            except Exception as e:
+                logger.error(f"Failed to generate download URL: {e}")
+                photo['download_url'] = None
+    
     return photos
 
 @api_router.get("/guest/{share_url}")

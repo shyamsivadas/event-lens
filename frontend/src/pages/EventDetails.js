@@ -175,10 +175,27 @@ const EventDetails = () => {
               {photos.map((photo) => (
                 <div
                   key={photo.photo_id}
-                  className="aspect-square bg-surface rounded-lg overflow-hidden border border-border"
+                  className="aspect-square bg-surface rounded-lg overflow-hidden border border-border group relative"
                 >
-                  <div className="w-full h-full flex items-center justify-center text-muted-foreground">
-                    <ImageIcon className="w-8 h-8" />
+                  {photo.download_url ? (
+                    <img
+                      src={photo.download_url}
+                      alt={photo.filename}
+                      className="w-full h-full object-cover transition-transform group-hover:scale-105"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-muted-foreground">
+                      <ImageIcon className="w-8 h-8" />
+                    </div>
+                  )}
+                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/50 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
+                    <a
+                      href={photo.download_url}
+                      download={photo.filename}
+                      className="text-white text-sm font-medium"
+                    >
+                      Download
+                    </a>
                   </div>
                 </div>
               ))}
