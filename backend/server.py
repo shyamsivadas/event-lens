@@ -525,13 +525,9 @@ async def create_flipbook(event_id: str, current_user: User = Depends(get_curren
                 json={
                     'pdf': pdf_url,
                     'client_id': heyzine_client_id,
-                    'prev_next': True,
+                    'template': 'dce36e099f71f95449f722bfc227cb4bdd1b30f0.pdf',
                     'title': event_doc['name'],
-                    'subtitle': f"Event Date: {event_doc['date']}",
-                    'show_info': True,
-                    'download': True,
-                    'full_screen': True,
-                    'share': True
+                    'subtitle': f"Event Date: {event_doc['date']}"
                 },
                 headers={
                     'Authorization': f'Bearer {heyzine_api_key}',
