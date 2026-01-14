@@ -15,6 +15,11 @@ import boto3
 from botocore.config import Config
 from botocore.exceptions import ClientError
 import httpx
+from reportlab.lib.pagesizes import A4, landscape
+from reportlab.pdfgen import canvas
+from PIL import Image
+import io
+import tempfile
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
