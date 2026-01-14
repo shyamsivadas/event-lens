@@ -384,6 +384,154 @@ async def track_upload(share_url: str, photo_data: dict):
     await db.photos.insert_one(photo_doc)
     return {"success": True}
 
+@api_router.post("/events/{event_id}/create-flipbook")
+async def create_flipbook(event_id: str, current_user: User = Depends(get_current_user)):
+    event_doc = await db.events.find_one(
+        {"event_id": event_id, "host_id": current_user.user_id},
+        {"_id": 0}
+    )
+    
+    if not event_doc:
+        raise HTTPException(status_code=404, detail="Event not found")
+    
+    photos = await db.photos.find(
+        {"event_id": event_id},
+        {"_id": 0}
+    ).to_list(10000)
+    
+    if len(photos) == 0:
+        raise HTTPException(status_code=400, detail="No photos to create flipbook")
+    
+    try:
+        r2_client = get_r2_client()
+        bucket_name = os.getenv('R2_BUCKET_NAME', 'event-photos')
+        heyzine_api_key = os.getenv('HEYZINE_API_KEY')
+        
+        if not heyzine_api_key:
+            raise HTTPException(status_code=500, detail="Heyzine API key not configured")
+        
+        with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as pdf_file:
+            pdf_path = pdf_file.name
+            
+            c = canvas.Canvas(pdf_path, pagesize=landscape(A4))
+            page_width, page_height = landscape(A4)
+            
+            photos_per_page = 4
+            margin = 20
+            spacing = 10
+            
+            cols = 2
+            rows = 2
+            img_width = (page_width - 2 * margin - spacing) / cols
+            img_height = (page_height - 2 * margin - spacing) / rows
+            
+            for idx, photo in enumerate(photos):
+                if idx > 0 and idx % photos_per_page == 0:
+                    c.showPage()
+                
+                position = idx % photos_per_page
+                col = position % cols
+                row = position // cols
+                
+                x = margin + col * (img_width + spacing)
+                y = page_height - margin - (row + 1) * img_height - row * spacing
+                
+                try:
+                    response = r2_client.get_object(
+                        Bucket=bucket_name,
+                        Key=photo['s3_key']
+                    )
+                    image_data = response['Body'].read()
+                    
+                    img = Image.open(io.BytesIO(image_data))
+                    
+                    img_ratio = img.width / img.height
+                    box_ratio = img_width / img_height
+                    
+                    if img_ratio > box_ratio:
+                        new_width = img_width
+                        new_height = img_width / img_ratio
+                        y_offset = (img_height - new_height) / 2
+                        c.drawImage(io.BytesIO(image_data), x, y + y_offset, 
+                                   width=new_width, height=new_height, 
+                                   preserveAspectRatio=True, mask='auto')
+                    else:
+                        new_height = img_height
+                        new_width = img_height * img_ratio
+                        x_offset = (img_width - new_width) / 2
+                        c.drawImage(io.BytesIO(image_data), x + x_offset, y, 
+                                   width=new_width, height=new_height, 
+                                   preserveAspectRatio=True, mask='auto')
+                    
+                except Exception as e:
+                    logger.error(f"Failed to add photo to PDF: {e}")
+                    continue
+            
+            c.save()
+        
+        with open(pdf_path, 'rb') as pdf:
+            pdf_content = pdf.read()
+        
+        r2_pdf_key = f"events/{event_id}/flipbook_{int(datetime.now(timezone.utc).timestamp())}.pdf"
+        r2_client.put_object(
+            Bucket=bucket_name,
+            Key=r2_pdf_key,
+            Body=pdf_content,
+            ContentType='application/pdf'
+        )
+        
+        pdf_url = r2_client.generate_presigned_url(
+            ClientMethod='get_object',
+            Params={
+                'Bucket': bucket_name,
+                'Key': r2_pdf_key
+            },
+            ExpiresIn=3600
+        )
+        
+        async with httpx.AsyncClient() as client:
+            heyzine_response = await client.post(
+                'https://heyzine.com/api1/rest',
+                json={
+                    'pdf': pdf_url,
+                    'client_id': heyzine_api_key,
+                    'prev_next': True,
+                    'title': event_doc['name'],
+                    'subtitle': f"Event Date: {event_doc['date']}"
+                },
+                headers={
+                    'Authorization': f'Bearer {heyzine_api_key}',
+                    'Content-Type': 'application/json'
+                },
+                timeout=60.0
+            )
+        
+        if heyzine_response.status_code == 200:
+            flipbook_data = heyzine_response.json()
+            flipbook_url = flipbook_data.get('url')
+            
+            await db.events.update_one(
+                {"event_id": event_id},
+                {"$set": {"flipbook_url": flipbook_url, "flipbook_created_at": datetime.now(timezone.utc)}}
+            )
+            
+            os.unlink(pdf_path)
+            
+            return {
+                "success": True,
+                "flipbook_url": flipbook_url,
+                "message": "Flipbook created successfully"
+            }
+        else:
+            logger.error(f"Heyzine API error: {heyzine_response.text}")
+            raise HTTPException(status_code=500, detail=f"Failed to create flipbook: {heyzine_response.text}")
+    
+    except Exception as e:
+        logger.error(f"Flipbook creation error: {e}")
+        if 'pdf_path' in locals() and os.path.exists(pdf_path):
+            os.unlink(pdf_path)
+        raise HTTPException(status_code=500, detail=f"Failed to create flipbook: {str(e)}")
+
 app.include_router(api_router)
 
 app.add_middleware(
