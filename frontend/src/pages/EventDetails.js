@@ -116,7 +116,7 @@ const EventDetails = () => {
                     type="text"
                     value={shareUrl}
                     readOnly
-                    className="flex-1 bg-surface px-4 py-3 rounded-lg border border-border"
+                    className="flex-1 bg-surface px-4 py-3 rounded-lg border border-border text-white"
                     data-testid="share-url-input"
                   />
                   <button
