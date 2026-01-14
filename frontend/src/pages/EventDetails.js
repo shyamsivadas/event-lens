@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { QRCode } from 'react-qrcode-logo';
-import { ArrowLeft, Share2, Download, Copy, Check, Image as ImageIcon, Trash2 } from 'lucide-react';
+import { ArrowLeft, Share2, Download, Copy, Check, Image as ImageIcon, Trash2, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
+import PhotoGallery from '@/components/PhotoGallery';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 
@@ -14,10 +15,18 @@ const EventDetails = () => {
   const [photos, setPhotos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     loadEvent();
     loadPhotos();
+    
+    // Auto-refresh photos every 10 seconds
+    const interval = setInterval(() => {
+      loadPhotos(true);
+    }, 10000);
+    
+    return () => clearInterval(interval);
   }, [eventId]);
 
   const loadEvent = async () => {
@@ -34,14 +43,19 @@ const EventDetails = () => {
     }
   };
 
-  const loadPhotos = async () => {
+  const loadPhotos = async (silent = false) => {
+    if (!silent) setRefreshing(true);
     try {
       const response = await axios.get(`${BACKEND_URL}/api/events/${eventId}/photos`, {
         withCredentials: true
       });
       setPhotos(response.data);
     } catch (error) {
-      console.error('Failed to load photos:', error);
+      if (!silent) {
+        console.error('Failed to load photos:', error);
+      }
+    } finally {
+      setRefreshing(false);
     }
   };
 
@@ -160,10 +174,19 @@ const EventDetails = () => {
         </div>
 
         <div className="glass rounded-2xl p-8">
-          <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
-            <ImageIcon className="w-6 h-6 text-primary" />
-            Photo Gallery ({photos.length})
-          </h2>
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-2xl font-bold flex items-center gap-2">
+              <Sparkles className="w-6 h-6 text-primary" />
+              Professional Gallery ({photos.length})
+            </h2>
+            <button
+              onClick={() => loadPhotos()}
+              disabled={refreshing}
+              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+            >
+              {refreshing ? 'Refreshing...' : 'Refresh'}
+            </button>
+          </div>
           
           {photos.length === 0 ? (
             <div className="text-center py-12">
@@ -171,35 +194,7 @@ const EventDetails = () => {
               <p className="text-muted-foreground">No photos yet. Share the link with guests to start collecting!</p>
             </div>
           ) : (
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-              {photos.map((photo) => (
-                <div
-                  key={photo.photo_id}
-                  className="aspect-square bg-surface rounded-lg overflow-hidden border border-border group relative"
-                >
-                  {photo.download_url ? (
-                    <img
-                      src={photo.download_url}
-                      alt={photo.filename}
-                      className="w-full h-full object-cover transition-transform group-hover:scale-105"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-muted-foreground">
-                      <ImageIcon className="w-8 h-8" />
-                    </div>
-                  )}
-                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/50 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
-                    <a
-                      href={photo.download_url}
-                      download={photo.filename}
-                      className="text-white text-sm font-medium"
-                    >
-                      Download
-                    </a>
-                  </div>
-                </div>
-              ))}
-            </div>
+            <PhotoGallery photos={photos} eventName={event.name} />
           )}
         </div>
       </div>
