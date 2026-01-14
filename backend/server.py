@@ -478,7 +478,8 @@ async def create_flipbook(event_id: str, current_user: User = Depends(get_curren
             Bucket=bucket_name,
             Key=r2_pdf_key,
             Body=pdf_content,
-            ContentType='application/pdf'
+            ContentType='application/pdf',
+            ACL='public-read'
         )
         
         pdf_url = r2_client.generate_presigned_url(
@@ -487,7 +488,7 @@ async def create_flipbook(event_id: str, current_user: User = Depends(get_curren
                 'Bucket': bucket_name,
                 'Key': r2_pdf_key
             },
-            ExpiresIn=3600
+            ExpiresIn=7200
         )
         
         async with httpx.AsyncClient() as client:
