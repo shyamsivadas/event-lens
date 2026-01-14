@@ -67,6 +67,7 @@ class Photo(BaseModel):
     device_id: str
     filename: str
     s3_key: str
+    note: Optional[str] = None
     uploaded_at: datetime
 
 class PresignedURLRequest(BaseModel):
