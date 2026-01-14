@@ -379,6 +379,23 @@ const PhotoGallery = ({ photos, eventName, galleryStyle = 'memory_archive' }) =>
           
           <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-all duration-300" />
           
+          {/* Note indicator */}
+          {photo.note && (
+            <div className="absolute bottom-2 left-2 right-2 bg-black/70 backdrop-blur-sm rounded-lg px-2 py-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+              <div className="flex items-start gap-1.5">
+                <MessageSquare className="w-3 h-3 text-white/70 flex-shrink-0 mt-0.5" />
+                <p className="text-xs text-white line-clamp-2">{photo.note}</p>
+              </div>
+            </div>
+          )}
+          
+          {/* Note badge (always visible) */}
+          {photo.note && (
+            <div className="absolute bottom-2 right-2 p-1.5 bg-primary rounded-full group-hover:opacity-0 transition-opacity">
+              <MessageSquare className="w-3 h-3 text-white" />
+            </div>
+          )}
+          
           {/* Preview button */}
           <button
             onClick={(e) => {
