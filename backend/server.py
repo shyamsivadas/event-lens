@@ -446,23 +446,35 @@ async def create_flipbook(event_id: str, current_user: User = Depends(get_curren
                     
                     img = Image.open(io.BytesIO(image_data))
                     
+                    # Convert to RGB if needed (for JPEG compatibility)
+                    if img.mode in ('RGBA', 'LA', 'P'):
+                        img = img.convert('RGB')
+                    
                     img_ratio = img.width / img.height
                     box_ratio = img_width / img_height
+                    
+                    # Save to temporary file for ReportLab
+                    with tempfile.NamedTemporaryFile(suffix='.jpg', delete=False) as temp_img:
+                        img.save(temp_img.name, 'JPEG', quality=85)
+                        temp_img_path = temp_img.name
                     
                     if img_ratio > box_ratio:
                         new_width = img_width
                         new_height = img_width / img_ratio
                         y_offset = (img_height - new_height) / 2
-                        c.drawImage(io.BytesIO(image_data), x, y + y_offset, 
+                        c.drawImage(temp_img_path, x, y + y_offset, 
                                    width=new_width, height=new_height, 
                                    preserveAspectRatio=True, mask='auto')
                     else:
                         new_height = img_height
                         new_width = img_height * img_ratio
                         x_offset = (img_width - new_width) / 2
-                        c.drawImage(io.BytesIO(image_data), x + x_offset, y, 
+                        c.drawImage(temp_img_path, x + x_offset, y, 
                                    width=new_width, height=new_height, 
                                    preserveAspectRatio=True, mask='auto')
+                    
+                    # Clean up temp file
+                    os.unlink(temp_img_path)
                     
                 except Exception as e:
                     logger.error(f"Failed to add photo to PDF: {e}")
