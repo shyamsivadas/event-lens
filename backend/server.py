@@ -481,8 +481,10 @@ async def create_flipbook(event_id: str, current_user: User = Depends(get_curren
             ContentType='application/pdf'
         )
         
-        r2_account_id = os.getenv('R2_ACCOUNT_ID')
-        pdf_url = f"https://{r2_account_id}.r2.cloudflarestorage.com/{bucket_name}/{r2_pdf_key}"
+        r2_public_url = os.getenv('R2_PUBLIC_URL')
+        pdf_url = f"{r2_public_url}/{r2_pdf_key}"
+        
+        logger.info(f"PDF uploaded to: {pdf_url}")
         
         async with httpx.AsyncClient() as client:
             heyzine_response = await client.post(
