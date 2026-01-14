@@ -1,25 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { X, Download, Share2, Play, Pause, ChevronLeft, ChevronRight, Grid3x3, LayoutGrid, ZoomIn } from 'lucide-react';
+import { X, Download, Share2, ChevronLeft, ChevronRight, ZoomIn, Heart } from 'lucide-react';
 import { toast } from 'sonner';
 
 const PhotoGallery = ({ photos, eventName }) => {
   const [selectedPhoto, setSelectedPhoto] = useState(null);
-  const [isSlideshow, setIsSlideshow] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [layout, setLayout] = useState('grid'); // 'grid' or 'masonry'
-  const [filter, setFilter] = useState('all');
+  const [favorites, setFavorites] = useState([]);
   const [downloading, setDownloading] = useState(false);
-
-  // Slideshow auto-advance
-  useEffect(() => {
-    if (isSlideshow && photos.length > 0) {
-      const timer = setInterval(() => {
-        setCurrentIndex((prev) => (prev + 1) % photos.length);
-        setSelectedPhoto(photos[(currentIndex + 1) % photos.length]);
-      }, 3000);
-      return () => clearInterval(timer);
-    }
-  }, [isSlideshow, currentIndex, photos]);
 
   const openLightbox = (photo, index) => {
     setSelectedPhoto(photo);
@@ -28,7 +15,6 @@ const PhotoGallery = ({ photos, eventName }) => {
 
   const closeLightbox = () => {
     setSelectedPhoto(null);
-    setIsSlideshow(false);
   };
 
   const nextPhoto = () => {
@@ -41,6 +27,14 @@ const PhotoGallery = ({ photos, eventName }) => {
     const newIndex = (currentIndex - 1 + photos.length) % photos.length;
     setCurrentIndex(newIndex);
     setSelectedPhoto(photos[newIndex]);
+  };
+
+  const toggleFavorite = (photoId) => {
+    if (favorites.includes(photoId)) {
+      setFavorites(favorites.filter(id => id !== photoId));
+    } else {
+      setFavorites([...favorites, photoId]);
+    }
   };
 
   const downloadPhoto = async (photo) => {
@@ -118,18 +112,15 @@ const PhotoGallery = ({ photos, eventName }) => {
   };
 
   const copyToClipboard = (url) => {
-    // Try modern clipboard API first
     if (navigator.clipboard && window.isSecureContext) {
       navigator.clipboard.writeText(url)
         .then(() => {
           toast.success('Link copied to clipboard!');
         })
         .catch(() => {
-          // Fallback to old method
           fallbackCopyToClipboard(url);
         });
     } else {
-      // Use fallback for older browsers or insecure contexts
       fallbackCopyToClipboard(url);
     }
   };
@@ -155,15 +146,6 @@ const PhotoGallery = ({ photos, eventName }) => {
     }
   };
 
-  const startSlideshow = () => {
-    setIsSlideshow(true);
-    if (!selectedPhoto && photos.length > 0) {
-      setSelectedPhoto(photos[0]);
-      setCurrentIndex(0);
-    }
-  };
-
-  // Keyboard navigation
   useEffect(() => {
     const handleKeyPress = (e) => {
       if (!selectedPhoto) return;
@@ -171,205 +153,181 @@ const PhotoGallery = ({ photos, eventName }) => {
       if (e.key === 'Escape') closeLightbox();
       if (e.key === 'ArrowRight') nextPhoto();
       if (e.key === 'ArrowLeft') prevPhoto();
-      if (e.key === ' ') setIsSlideshow(!isSlideshow);
     };
 
     window.addEventListener('keydown', handleKeyPress);
     return () => window.removeEventListener('keydown', handleKeyPress);
-  }, [selectedPhoto, isSlideshow]);
+  }, [selectedPhoto]);
 
   return (
     <>
-      {/* Gallery Controls */}
-      <div className="flex items-center justify-between mb-6 flex-wrap gap-4">
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setLayout('grid')}
-            className={`p-2 rounded-lg transition-colors ${
-              layout === 'grid' ? 'bg-primary text-white' : 'bg-surface text-muted-foreground hover:bg-surface/80'
-            }`}
-            data-testid="grid-layout-btn"
-          >
-            <Grid3x3 className="w-5 h-5" />
-          </button>
-          <button
-            onClick={() => setLayout('masonry')}
-            className={`p-2 rounded-lg transition-colors ${
-              layout === 'masonry' ? 'bg-primary text-white' : 'bg-surface text-muted-foreground hover:bg-surface/80'
-            }`}
-            data-testid="masonry-layout-btn"
-          >
-            <LayoutGrid className="w-5 h-5" />
-          </button>
+      {/* Pixieset-style Gallery Controls */}
+      <div className="flex items-center justify-between mb-8">
+        <div className="text-sm text-gray-500">
+          {photos.length} {photos.length === 1 ? 'Photo' : 'Photos'}
         </div>
-
-        <div className="flex items-center gap-2">
-          <button
-            onClick={startSlideshow}
-            className="btn-primary flex items-center gap-2"
-            data-testid="start-slideshow-btn"
-          >
-            <Play className="w-4 h-4" />
-            Slideshow
-          </button>
-          <button
-            onClick={downloadAll}
-            disabled={downloading}
-            className="btn-primary flex items-center gap-2"
-            data-testid="download-all-btn"
-          >
-            <Download className="w-4 h-4" />
-            {downloading ? 'Downloading...' : 'Download All'}
-          </button>
-        </div>
+        <button
+          onClick={downloadAll}
+          disabled={downloading}
+          className="px-6 py-2.5 bg-black text-white rounded-md hover:bg-gray-800 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+          data-testid="download-all-btn"
+        >
+          {downloading ? 'Downloading...' : 'Download All'}
+        </button>
       </div>
 
-      {/* Gallery Grid */}
-      <div
-        className={`${
-          layout === 'grid'
-            ? 'grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4'
-            : 'columns-2 md:columns-3 lg:columns-4 gap-4 space-y-4'
-        }`}
-      >
+      {/* Pixieset-style Photo Grid */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
         {photos.map((photo, index) => (
           <div
             key={photo.photo_id}
-            className="group relative cursor-pointer overflow-hidden rounded-lg border border-border bg-surface transition-all hover:border-primary/50 hover:scale-[1.02]"
+            className="group relative aspect-square cursor-pointer overflow-hidden bg-gray-100"
             onClick={() => openLightbox(photo, index)}
             data-testid={`photo-${index}`}
           >
-            <div className="aspect-square w-full overflow-hidden">
-              {photo.download_url ? (
-                <img
-                  src={photo.download_url}
-                  alt={photo.filename}
-                  className="w-full h-full object-cover transition-transform group-hover:scale-110"
-                  loading="lazy"
-                />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center text-muted-foreground bg-surface">
-                  <ZoomIn className="w-8 h-8" />
-                </div>
-              )}
-            </div>
-            
-            {/* Hover Overlay */}
-            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/60 transition-all flex items-center justify-center opacity-0 group-hover:opacity-100">
-              <div className="flex gap-2">
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    downloadPhoto(photo);
-                  }}
-                  className="p-2 bg-white/20 backdrop-blur-sm rounded-full hover:bg-white/30 transition-colors"
-                  data-testid={`download-photo-${index}`}
-                >
-                  <Download className="w-5 h-5 text-white" />
-                </button>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    sharePhoto(photo);
-                  }}
-                  className="p-2 bg-white/20 backdrop-blur-sm rounded-full hover:bg-white/30 transition-colors"
-                  data-testid={`share-photo-${index}`}
-                >
-                  <Share2 className="w-5 h-5 text-white" />
-                </button>
+            {photo.download_url ? (
+              <img
+                src={photo.download_url}
+                alt={photo.filename}
+                className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                loading="lazy"
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center text-gray-400">
+                <ZoomIn className="w-8 h-8" />
               </div>
-            </div>
+            )}
+            
+            {/* Hover Overlay - Pixieset Style */}
+            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-all duration-300" />
+            
+            {/* Favorite Icon */}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                toggleFavorite(photo.photo_id);
+              }}
+              className="absolute top-3 right-3 p-1.5 bg-white/90 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300 hover:bg-white"
+              data-testid={`favorite-${index}`}
+            >
+              <Heart
+                className={`w-4 h-4 ${
+                  favorites.includes(photo.photo_id)
+                    ? 'fill-red-500 text-red-500'
+                    : 'text-gray-700'
+                }`}
+              />
+            </button>
           </div>
         ))}
       </div>
 
-      {/* Lightbox Modal */}
+      {/* Pixieset-style Lightbox */}
       {selectedPhoto && (
         <div
-          className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center"
-          onClick={closeLightbox}
+          className="fixed inset-0 z-50 bg-white flex flex-col"
           data-testid="lightbox-modal"
         >
-          {/* Close Button */}
-          <button
-            onClick={closeLightbox}
-            className="absolute top-4 right-4 p-2 bg-white/10 backdrop-blur-sm rounded-full hover:bg-white/20 transition-colors z-10"
-            data-testid="close-lightbox-btn"
-          >
-            <X className="w-6 h-6 text-white" />
-          </button>
-
-          {/* Image Counter */}
-          <div className="absolute top-4 left-4 glass px-4 py-2 rounded-full text-white font-mono z-10">
-            {currentIndex + 1} / {photos.length}
+          {/* Top Bar */}
+          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+            <div className="flex items-center gap-4">
+              <button
+                onClick={closeLightbox}
+                className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+                data-testid="close-lightbox-btn"
+              >
+                <X className="w-5 h-5 text-gray-700" />
+              </button>
+              <span className="text-sm text-gray-600 font-medium">
+                {currentIndex + 1} / {photos.length}
+              </span>
+            </div>
+            
+            <div className="flex items-center gap-2">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  sharePhoto(selectedPhoto);
+                }}
+                className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+              >
+                <Share2 className="w-5 h-5 text-gray-700" />
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  downloadPhoto(selectedPhoto);
+                }}
+                className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+              >
+                <Download className="w-5 h-5 text-gray-700" />
+              </button>
+            </div>
           </div>
 
-          {/* Navigation Buttons */}
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              prevPhoto();
-            }}
-            className="absolute left-4 p-3 bg-white/10 backdrop-blur-sm rounded-full hover:bg-white/20 transition-colors z-10"
-            data-testid="prev-photo-btn"
-          >
-            <ChevronLeft className="w-6 h-6 text-white" />
-          </button>
+          {/* Image Display Area */}
+          <div className="flex-1 flex items-center justify-center p-4 relative">
+            {/* Navigation Buttons */}
+            {photos.length > 1 && (
+              <>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    prevPhoto();
+                  }}
+                  className="absolute left-4 p-3 bg-white shadow-lg rounded-full hover:bg-gray-50 transition-colors z-10"
+                  data-testid="prev-photo-btn"
+                >
+                  <ChevronLeft className="w-6 h-6 text-gray-700" />
+                </button>
 
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              nextPhoto();
-            }}
-            className="absolute right-4 p-3 bg-white/10 backdrop-blur-sm rounded-full hover:bg-white/20 transition-colors z-10"
-            data-testid="next-photo-btn"
-          >
-            <ChevronRight className="w-6 h-6 text-white" />
-          </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    nextPhoto();
+                  }}
+                  className="absolute right-4 p-3 bg-white shadow-lg rounded-full hover:bg-gray-50 transition-colors z-10"
+                  data-testid="next-photo-btn"
+                >
+                  <ChevronRight className="w-6 h-6 text-gray-700" />
+                </button>
+              </>
+            )}
 
-          {/* Control Buttons */}
-          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-2 glass px-4 py-2 rounded-full z-10">
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setIsSlideshow(!isSlideshow);
-              }}
-              className="p-2 hover:bg-white/10 rounded-full transition-colors"
-              data-testid="toggle-slideshow-btn"
-            >
-              {isSlideshow ? (
-                <Pause className="w-5 h-5 text-white" />
-              ) : (
-                <Play className="w-5 h-5 text-white" />
-              )}
-            </button>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                downloadPhoto(selectedPhoto);
-              }}
-              className="p-2 hover:bg-white/10 rounded-full transition-colors"
-            >
-              <Download className="w-5 h-5 text-white" />
-            </button>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                sharePhoto(selectedPhoto);
-              }}
-              className="p-2 hover:bg-white/10 rounded-full transition-colors"
-            >
-              <Share2 className="w-5 h-5 text-white" />
-            </button>
+            {/* Main Image */}
+            <img
+              src={selectedPhoto.download_url}
+              alt={selectedPhoto.filename}
+              className="max-h-full max-w-full object-contain"
+              onClick={(e) => e.stopPropagation()}
+            />
           </div>
 
-          {/* Main Image */}
-          <img
-            src={selectedPhoto.download_url}
-            alt={selectedPhoto.filename}
-            className="max-h-[90vh] max-w-[90vw] object-contain"
-            onClick={(e) => e.stopPropagation()}
-          />
+          {/* Bottom Thumbnail Strip */}
+          <div className="border-t border-gray-200 p-4 bg-white">
+            <div className="flex gap-2 overflow-x-auto pb-2">
+              {photos.map((photo, index) => (
+                <button
+                  key={photo.photo_id}
+                  onClick={() => {
+                    setCurrentIndex(index);
+                    setSelectedPhoto(photo);
+                  }}
+                  className={`flex-shrink-0 w-20 h-20 rounded overflow-hidden border-2 transition-all ${
+                    index === currentIndex
+                      ? 'border-black'
+                      : 'border-transparent opacity-60 hover:opacity-100'
+                  }`}
+                >
+                  <img
+                    src={photo.download_url}
+                    alt="thumbnail"
+                    className="w-full h-full object-cover"
+                  />
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
       )}
     </>
