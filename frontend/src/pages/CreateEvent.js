@@ -65,7 +65,7 @@ const CreateEvent = () => {
                 type="text"
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                className="w-full bg-surface px-4 py-3 rounded-lg border border-border focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-colors"
+                className="w-full bg-surface px-4 py-3 rounded-lg border border-border focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-colors text-white"
                 placeholder="My Awesome Event"
                 data-testid="event-name-input"
               />
@@ -77,7 +77,7 @@ const CreateEvent = () => {
                 type="date"
                 value={formData.date}
                 onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-                className="w-full bg-surface px-4 py-3 rounded-lg border border-border focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-colors"
+                className="w-full bg-surface px-4 py-3 rounded-lg border border-border focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-colors text-white"
                 data-testid="event-date-input"
               />
             </div>
@@ -88,7 +88,7 @@ const CreateEvent = () => {
                 type="url"
                 value={formData.logo_url}
                 onChange={(e) => setFormData({ ...formData, logo_url: e.target.value })}
-                className="w-full bg-surface px-4 py-3 rounded-lg border border-border focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-colors"
+                className="w-full bg-surface px-4 py-3 rounded-lg border border-border focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-colors text-white"
                 placeholder="https://example.com/logo.png"
                 data-testid="event-logo-input"
               />
@@ -99,7 +99,7 @@ const CreateEvent = () => {
               <select
                 value={formData.filter_type}
                 onChange={(e) => setFormData({ ...formData, filter_type: e.target.value })}
-                className="w-full bg-surface px-4 py-3 rounded-lg border border-border focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-colors"
+                className="w-full bg-surface px-4 py-3 rounded-lg border border-border focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-colors text-white"
                 data-testid="filter-select"
               >
                 <option value="warm">Warm</option>
@@ -118,7 +118,7 @@ const CreateEvent = () => {
                 onChange={(e) => setFormData({ ...formData, max_photos: parseInt(e.target.value) })}
                 min="1"
                 max="20"
-                className="w-full bg-surface px-4 py-3 rounded-lg border border-border focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-colors"
+                className="w-full bg-surface px-4 py-3 rounded-lg border border-border focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-colors text-white"
                 data-testid="max-photos-input"
               />
             </div>
