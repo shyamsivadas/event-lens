@@ -51,13 +51,14 @@ const LandingPage = () => {
             </div>
           </div>
 
-          {/* Hero Image Placeholder */}
+          {/* Hero Image */}
           <div className="mt-20 relative">
-            <div className="aspect-video bg-gradient-to-br from-gray-100 to-gray-200 rounded-3xl flex items-center justify-center shadow-2xl">
-              <div className="text-center">
-                <Camera className="w-20 h-20 text-gray-400 mx-auto mb-4" />
-                <p className="text-gray-500 text-lg">Hero Demo Preview</p>
-              </div>
+            <div className="rounded-3xl overflow-hidden shadow-2xl">
+              <img 
+                src="https://customer-assets.emergentagent.com/job_snapshare-157/artifacts/b4m1ii9i_ChatGPT%20Image%20Jan%2014%2C%202026%2C%2011_39_28%20PM.png"
+                alt="SnapShare Gallery Preview - Archive style photo collage"
+                className="w-full h-auto object-cover"
+              />
             </div>
             {/* Floating Elements */}
             <div className="absolute -top-10 -left-10 w-24 h-24 bg-yellow-400 rounded-full opacity-60 blur-xl" />
