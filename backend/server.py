@@ -419,6 +419,20 @@ async def create_flipbook(event_id: str, current_user: User = Depends(get_curren
             c = canvas.Canvas(pdf_path, pagesize=landscape(A4))
             page_width, page_height = landscape(A4)
             
+            flipbook_style = event_doc.get('flipbook_style', 'memory_archive')
+            
+            if flipbook_style == 'typography_collage':
+                # Style 2: Typography Collage with bold text overlay
+                generate_typography_collage_pdf(c, photos, event_doc, page_width, page_height, r2_client, bucket_name)
+            elif flipbook_style == 'minimalist_story':
+                # Style 3: Minimalist Instagram Story style
+                generate_minimalist_story_pdf(c, photos, event_doc, page_width, page_height, r2_client, bucket_name)
+            else:
+                # Style 1: Memory Archive (default)
+                generate_memory_archive_pdf(c, photos, event_doc, page_width, page_height, r2_client, bucket_name)
+            
+            c.save()
+            
             # Professional magazine layout
             photos_per_page = 1  # One large photo per page for maximum impact
             margin = 40
