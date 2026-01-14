@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { QRCodeSVG } from 'react-qrcode-logo';
+import { QRCode } from 'react-qrcode-logo';
 import { ArrowLeft, Share2, Download, Copy, Check, Image as ImageIcon, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
