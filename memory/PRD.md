@@ -33,7 +33,11 @@ SnapShare is a full-stack application that allows event hosts to collect photos 
 
 ### Guest Camera Experience
 - [x] Direct camera access via unique URL
-- [x] Live filter preview (warm, party, wedding, corporate, vintage)
+- [x] **Premium Filter Pack** - 10 cinematic camera looks with Canvas pixel manipulation:
+  - **Premium Filters**: Luxury, Night, Pastel, Film, Editorial
+  - **Wedding Filters**: Romance, Royal, Pure, Candle, Memory
+- [x] Live filter preview (CSS approximation for performance)
+- [x] Filters baked into captured images (Canvas pixel manipulation)
 - [x] Front/back camera toggle
 - [x] Flash control
 - [x] Photo limit enforcement per device
