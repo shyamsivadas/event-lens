@@ -99,7 +99,7 @@ const PhotoGallery = ({ photos, eventName }) => {
   };
 
   const sharePhoto = async (photo) => {
-    if (navigator.share) {
+    if (navigator.share && navigator.canShare) {
       try {
         await navigator.share({
           title: eventName,
@@ -118,8 +118,41 @@ const PhotoGallery = ({ photos, eventName }) => {
   };
 
   const copyToClipboard = (url) => {
-    navigator.clipboard.writeText(url);
-    toast.success('Link copied to clipboard!');
+    // Try modern clipboard API first
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(url)
+        .then(() => {
+          toast.success('Link copied to clipboard!');
+        })
+        .catch(() => {
+          // Fallback to old method
+          fallbackCopyToClipboard(url);
+        });
+    } else {
+      // Use fallback for older browsers or insecure contexts
+      fallbackCopyToClipboard(url);
+    }
+  };
+
+  const fallbackCopyToClipboard = (url) => {
+    const textArea = document.createElement('textarea');
+    textArea.value = url;
+    textArea.style.position = 'fixed';
+    textArea.style.left = '-999999px';
+    textArea.style.top = '-999999px';
+    document.body.appendChild(textArea);
+    textArea.focus();
+    textArea.select();
+    
+    try {
+      document.execCommand('copy');
+      toast.success('Link copied to clipboard!');
+    } catch (err) {
+      console.error('Failed to copy:', err);
+      toast.error('Failed to copy link');
+    } finally {
+      textArea.remove();
+    }
   };
 
   const startSlideshow = () => {
