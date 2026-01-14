@@ -406,9 +406,10 @@ async def create_flipbook(event_id: str, current_user: User = Depends(get_curren
         r2_client = get_r2_client()
         bucket_name = os.getenv('R2_BUCKET_NAME', 'event-photos')
         heyzine_api_key = os.getenv('HEYZINE_API_KEY')
+        heyzine_client_id = os.getenv('HEYZINE_CLIENT_ID')
         
-        if not heyzine_api_key:
-            raise HTTPException(status_code=500, detail="Heyzine API key not configured")
+        if not heyzine_api_key or not heyzine_client_id:
+            raise HTTPException(status_code=500, detail="Heyzine API credentials not configured")
         
         with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as pdf_file:
             pdf_path = pdf_file.name
@@ -494,7 +495,7 @@ async def create_flipbook(event_id: str, current_user: User = Depends(get_curren
                 'https://heyzine.com/api1/rest',
                 json={
                     'pdf': pdf_url,
-                    'client_id': heyzine_api_key,
+                    'client_id': heyzine_client_id,
                     'prev_next': True,
                     'title': event_doc['name'],
                     'subtitle': f"Event Date: {event_doc['date']}"
