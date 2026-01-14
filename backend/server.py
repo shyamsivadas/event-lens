@@ -58,6 +58,7 @@ class EventCreate(BaseModel):
     logo_url: Optional[str] = None
     filter_type: str = "warm"
     max_photos: int = 5
+    flipbook_style: str = "memory_archive"  # memory_archive, typography_collage, minimalist_story
 
 class Photo(BaseModel):
     photo_id: str
@@ -211,6 +212,7 @@ async def create_event(event_data: EventCreate, current_user: User = Depends(get
         "logo_url": event_data.logo_url,
         "filter_type": event_data.filter_type,
         "max_photos": event_data.max_photos,
+        "flipbook_style": event_data.flipbook_style,
         "share_url": share_url,
         "created_at": datetime.now(timezone.utc)
     }
