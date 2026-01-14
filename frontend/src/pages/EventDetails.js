@@ -146,10 +146,10 @@ const EventDetails = () => {
           <div className="glass rounded-2xl p-8 flex flex-col items-center justify-center">
             <h3 className="text-lg font-semibold mb-4">QR Code</h3>
             <div className="bg-white p-4 rounded-lg">
-              <QRCodeSVG
+              <QRCode
                 value={shareUrl}
                 size={200}
-                level="H"
+                quietZone={10}
                 data-testid="qr-code"
               />
             </div>
