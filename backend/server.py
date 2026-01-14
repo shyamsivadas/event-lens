@@ -68,19 +68,21 @@ class PresignedURLRequest(BaseModel):
     filename: str
     content_type: str
 
-def get_gcs_client():
-    credentials_path = os.getenv('GOOGLE_APPLICATION_CREDENTIALS')
-    bucket_name = os.getenv('GCS_BUCKET_NAME', 'event-photos')
+def get_r2_client():
+    r2_account_id = os.getenv('R2_ACCOUNT_ID')
+    r2_access_key = os.getenv('R2_ACCESS_KEY_ID')
+    r2_secret_key = os.getenv('R2_SECRET_ACCESS_KEY')
     
-    if not credentials_path or not os.path.exists(credentials_path):
-        return None, bucket_name
+    if not all([r2_account_id, r2_access_key, r2_secret_key]):
+        return None
     
-    try:
-        client = storage.Client.from_service_account_json(credentials_path)
-        return client, bucket_name
-    except Exception as e:
-        logger.error(f\"GCS client initialization error: {e}\")
-        return None, bucket_name
+    return boto3.client(
+        's3',
+        endpoint_url=f'https://{r2_account_id}.r2.cloudflarestorage.com',
+        aws_access_key_id=r2_access_key,
+        aws_secret_access_key=r2_secret_key,
+        config=Config(signature_version='s3v4')
+    )
 
 async def get_current_user(session_token: Optional[str] = Cookie(None)):
     if not session_token:
