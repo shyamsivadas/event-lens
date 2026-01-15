@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import FingerprintJS from '@fingerprintjs/fingerprintjs';
-import { Camera, ImagePlus, MessageSquare, X, Check, Pencil, Trash2, Plus } from 'lucide-react';
+import { Camera, ImagePlus, ChevronLeft, ChevronRight, X, Check, Plus, Send } from 'lucide-react';
 import { toast } from 'sonner';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
@@ -12,17 +12,17 @@ const GuestCamera = () => {
   const navigate = useNavigate();
   const cameraInputRef = useRef(null);
   const galleryInputRef = useRef(null);
+  const noteInputRef = useRef(null);
   
   const [event, setEvent] = useState(null);
   const [deviceId, setDeviceId] = useState(null);
   const [photoCount, setPhotoCount] = useState({ used: 0, max: 5 });
   const [loading, setLoading] = useState(true);
   
-  // Multiple photos feature
-  const [selectedPhotos, setSelectedPhotos] = useState([]); // Array of { file, previewUrl }
-  const [showReview, setShowReview] = useState(false);
-  const [note, setNote] = useState('');
-  const [isEditingNote, setIsEditingNote] = useState(false);
+  // Multiple photos with individual notes
+  const [selectedPhotos, setSelectedPhotos] = useState([]); // Array of { file, previewUrl, note }
+  const [showNoteEditor, setShowNoteEditor] = useState(false);
+  const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
   const [uploading, setUploading] = useState(false);
 
   const MAX_PHOTOS_PER_BATCH = 5;
@@ -30,14 +30,18 @@ const GuestCamera = () => {
   useEffect(() => {
     initializeApp();
     return () => {
-      // Clean up preview URLs
       selectedPhotos.forEach(photo => {
-        if (photo.previewUrl) {
-          URL.revokeObjectURL(photo.previewUrl);
-        }
+        if (photo.previewUrl) URL.revokeObjectURL(photo.previewUrl);
       });
     };
   }, [shareUrl]);
+
+  // Auto-focus note input when switching photos
+  useEffect(() => {
+    if (showNoteEditor && noteInputRef.current) {
+      noteInputRef.current.focus();
+    }
+  }, [currentPhotoIndex, showNoteEditor]);
 
   const initializeApp = async () => {
     try {
@@ -79,19 +83,18 @@ const GuestCamera = () => {
     const filesToAdd = files.slice(0, maxSelectable);
 
     const newPhotos = filesToAdd.map(file => {
-      // Validate file type
       if (!file.type.startsWith('image/')) {
         toast.error(`${file.name} is not an image`);
         return null;
       }
-      // Validate file size (max 20MB)
       if (file.size > 20 * 1024 * 1024) {
         toast.error(`${file.name} is too large (max 20MB)`);
         return null;
       }
       return {
         file,
-        previewUrl: URL.createObjectURL(file)
+        previewUrl: URL.createObjectURL(file),
+        note: ''
       };
     }).filter(Boolean);
 
@@ -100,57 +103,77 @@ const GuestCamera = () => {
       toast.success(`${newPhotos.length} photo${newPhotos.length > 1 ? 's' : ''} added`);
     }
 
-    // Reset input
     e.target.value = '';
   };
 
-  const openCamera = () => {
-    cameraInputRef.current?.click();
-  };
-
-  const openGallery = () => {
-    galleryInputRef.current?.click();
-  };
+  const openCamera = () => cameraInputRef.current?.click();
+  const openGallery = () => galleryInputRef.current?.click();
 
   const removePhoto = (index) => {
     setSelectedPhotos(prev => {
       const photo = prev[index];
-      if (photo.previewUrl) {
-        URL.revokeObjectURL(photo.previewUrl);
+      if (photo.previewUrl) URL.revokeObjectURL(photo.previewUrl);
+      const newPhotos = prev.filter((_, i) => i !== index);
+      
+      // Adjust current index if needed
+      if (currentPhotoIndex >= newPhotos.length && newPhotos.length > 0) {
+        setCurrentPhotoIndex(newPhotos.length - 1);
       }
-      return prev.filter((_, i) => i !== index);
+      
+      // Close editor if no photos left
+      if (newPhotos.length === 0) {
+        setShowNoteEditor(false);
+      }
+      
+      return newPhotos;
     });
   };
 
   const clearAllPhotos = () => {
     selectedPhotos.forEach(photo => {
-      if (photo.previewUrl) {
-        URL.revokeObjectURL(photo.previewUrl);
-      }
+      if (photo.previewUrl) URL.revokeObjectURL(photo.previewUrl);
     });
     setSelectedPhotos([]);
-    setShowReview(false);
-    setNote('');
+    setShowNoteEditor(false);
+    setCurrentPhotoIndex(0);
   };
 
-  const proceedToReview = () => {
+  const updateNote = (index, note) => {
+    setSelectedPhotos(prev => prev.map((photo, i) => 
+      i === index ? { ...photo, note } : photo
+    ));
+  };
+
+  const proceedToNotes = () => {
     if (selectedPhotos.length === 0) {
       toast.error('Please select at least one photo');
       return;
     }
-    setShowReview(true);
+    setCurrentPhotoIndex(0);
+    setShowNoteEditor(true);
+  };
+
+  const goToNextPhoto = () => {
+    if (currentPhotoIndex < selectedPhotos.length - 1) {
+      setCurrentPhotoIndex(prev => prev + 1);
+    }
+  };
+
+  const goToPrevPhoto = () => {
+    if (currentPhotoIndex > 0) {
+      setCurrentPhotoIndex(prev => prev - 1);
+    }
   };
 
   const uploadPhotos = async () => {
     if (selectedPhotos.length === 0 || uploading) return;
     
     setUploading(true);
-    const photoNote = note.trim();
     let successCount = 0;
 
     try {
       for (let i = 0; i < selectedPhotos.length; i++) {
-        const { file, previewUrl } = selectedPhotos[i];
+        const { previewUrl, note } = selectedPhotos[i];
         const filename = `photo_${Date.now()}_${i}.jpg`;
 
         // Convert to JPEG blob
@@ -163,7 +186,6 @@ const GuestCamera = () => {
           img.src = previewUrl;
         });
 
-        // Resize if needed (max 1920px)
         const maxSize = 1920;
         let width = img.width;
         let height = img.height;
@@ -187,7 +209,6 @@ const GuestCamera = () => {
           canvas.toBlob(resolve, 'image/jpeg', 0.9);
         });
 
-        // Get presigned URL
         const urlResponse = await axios.post(
           `${BACKEND_URL}/api/guest/${shareUrl}/presigned-url`,
           {
@@ -198,20 +219,18 @@ const GuestCamera = () => {
           }
         );
 
-        // Upload to R2
         const uploadResponse = await axios.put(urlResponse.data.url, blob, {
           headers: { 'Content-Type': 'image/jpeg' }
         });
 
         if (uploadResponse.status === 200) {
-          // Track upload - only add note to first photo
           await axios.post(
             `${BACKEND_URL}/api/guest/${shareUrl}/track-upload`,
             {
               device_id: deviceId,
               filename: filename,
               s3_key: urlResponse.data.object_key,
-              note: i === 0 ? photoNote : ''
+              note: note.trim()
             }
           );
           successCount++;
@@ -227,14 +246,10 @@ const GuestCamera = () => {
         });
 
         toast.success(`${successCount} photo${successCount > 1 ? 's' : ''} uploaded!`);
-        
-        // Clean up
         clearAllPhotos();
 
         if (newUsed >= photoCount.max) {
-          setTimeout(() => {
-            navigate(`/e/${shareUrl}/thankyou`);
-          }, 1000);
+          setTimeout(() => navigate(`/e/${shareUrl}/thankyou`), 1000);
         }
       }
     } catch (error) {
@@ -256,129 +271,160 @@ const GuestCamera = () => {
     );
   }
 
-  // Review Screen - Show selected photos and notes
-  if (showReview) {
+  // Note Editor Screen - Swipe through photos and add notes
+  if (showNoteEditor && selectedPhotos.length > 0) {
+    const currentPhoto = selectedPhotos[currentPhotoIndex];
+    const isFirstPhoto = currentPhotoIndex === 0;
+    const isLastPhoto = currentPhotoIndex === selectedPhotos.length - 1;
+    const notesAdded = selectedPhotos.filter(p => p.note.trim()).length;
+
     return (
-      <div className="fixed inset-0 bg-gradient-to-b from-gray-900 to-black overflow-auto" data-testid="photo-review">
+      <div className="fixed inset-0 bg-black flex flex-col" data-testid="note-editor">
+        {/* Full-screen photo background */}
+        <div className="absolute inset-0">
+          <img 
+            src={currentPhoto.previewUrl} 
+            alt={`Photo ${currentPhotoIndex + 1}`}
+            className="w-full h-full object-cover"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-black/60" />
+        </div>
+
         {/* Header */}
-        <div className="sticky top-0 p-4 z-10 bg-gradient-to-b from-gray-900 to-transparent">
-          <div className="glass rounded-2xl p-4 flex items-center justify-between">
+        <div className="relative z-10 p-4">
+          <div className="flex items-center justify-between">
             <button
-              onClick={() => setShowReview(false)}
-              className="p-2 hover:bg-white/10 rounded-full transition-colors"
+              onClick={() => setShowNoteEditor(false)}
+              className="p-2 bg-white/10 backdrop-blur-sm rounded-full hover:bg-white/20 transition-colors"
             >
               <X className="w-5 h-5 text-white" />
             </button>
+            
             <div className="text-center">
-              <h2 className="font-bold text-white">{event.name}</h2>
-              <p className="text-xs text-white/70">Review & Upload</p>
+              <p className="text-white font-semibold">{currentPhotoIndex + 1} of {selectedPhotos.length}</p>
+              <p className="text-white/60 text-xs">{notesAdded} note{notesAdded !== 1 ? 's' : ''} added</p>
             </div>
-            <div className="mono text-white font-semibold">
-              {selectedPhotos.length} photo{selectedPhotos.length !== 1 ? 's' : ''}
-            </div>
+
+            <button
+              onClick={() => removePhoto(currentPhotoIndex)}
+              className="p-2 bg-red-500/80 backdrop-blur-sm rounded-full hover:bg-red-500 transition-colors"
+            >
+              <X className="w-5 h-5 text-white" />
+            </button>
+          </div>
+
+          {/* Photo dots indicator */}
+          <div className="flex justify-center gap-2 mt-4">
+            {selectedPhotos.map((photo, index) => (
+              <button
+                key={index}
+                onClick={() => setCurrentPhotoIndex(index)}
+                className={`transition-all duration-300 rounded-full ${
+                  index === currentPhotoIndex 
+                    ? 'w-8 h-2 bg-white' 
+                    : photo.note.trim() 
+                      ? 'w-2 h-2 bg-green-400' 
+                      : 'w-2 h-2 bg-white/40'
+                }`}
+              />
+            ))}
           </div>
         </div>
 
-        {/* Photo Grid */}
-        <div className="px-4 pb-4">
-          <div className="grid grid-cols-2 gap-3 mb-6">
-            {selectedPhotos.map((photo, index) => (
-              <div key={index} className="relative aspect-square rounded-xl overflow-hidden bg-gray-800">
-                <img 
-                  src={photo.previewUrl} 
-                  alt={`Photo ${index + 1}`}
-                  className="w-full h-full object-cover"
-                />
-                <button
-                  onClick={() => removePhoto(index)}
-                  className="absolute top-2 right-2 p-2 bg-red-500 rounded-full text-white hover:bg-red-600 transition-colors"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-                <div className="absolute bottom-2 left-2 bg-black/60 px-2 py-1 rounded-lg text-xs text-white">
-                  {index + 1}
-                </div>
-              </div>
-            ))}
-          </div>
+        {/* Spacer */}
+        <div className="flex-1 relative z-10 flex items-center justify-between px-2">
+          {/* Left Arrow */}
+          <button
+            onClick={goToPrevPhoto}
+            disabled={isFirstPhoto}
+            className={`p-3 rounded-full transition-all ${
+              isFirstPhoto 
+                ? 'opacity-0 pointer-events-none' 
+                : 'bg-white/10 backdrop-blur-sm hover:bg-white/20'
+            }`}
+          >
+            <ChevronLeft className="w-6 h-6 text-white" />
+          </button>
 
-          {/* Note Section */}
-          <div className="glass rounded-2xl p-4 mb-4">
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-2">
-                <MessageSquare className="w-4 h-4 text-white/70" />
-                <span className="text-sm font-medium text-white/90">Add a note (optional)</span>
-              </div>
-              {note && !isEditingNote && (
-                <button
-                  onClick={() => setIsEditingNote(true)}
-                  className="flex items-center gap-1 text-xs text-white hover:text-white/80 transition-colors"
-                  data-testid="edit-note-btn"
-                >
-                  <Pencil className="w-3 h-3" />
-                  Edit
-                </button>
+          {/* Right Arrow */}
+          <button
+            onClick={goToNextPhoto}
+            disabled={isLastPhoto}
+            className={`p-3 rounded-full transition-all ${
+              isLastPhoto 
+                ? 'opacity-0 pointer-events-none' 
+                : 'bg-white/10 backdrop-blur-sm hover:bg-white/20'
+            }`}
+          >
+            <ChevronRight className="w-6 h-6 text-white" />
+          </button>
+        </div>
+
+        {/* Bottom Section - Note Input */}
+        <div className="relative z-10 p-4 pb-6">
+          {/* Note Input */}
+          <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 mb-4 border border-white/20">
+            <textarea
+              ref={noteInputRef}
+              value={currentPhoto.note}
+              onChange={(e) => updateNote(currentPhotoIndex, e.target.value)}
+              placeholder="Add a note for this photo..."
+              className="w-full bg-transparent text-white placeholder:text-white/50 outline-none resize-none text-base leading-relaxed"
+              rows={2}
+              maxLength={280}
+              data-testid="photo-note-input"
+            />
+            <div className="flex items-center justify-between mt-2">
+              <span className="text-xs text-white/50">{currentPhoto.note.length}/280</span>
+              {currentPhoto.note.trim() && (
+                <span className="text-xs text-green-400">✓ Note added</span>
               )}
             </div>
-            
-            {isEditingNote || !note ? (
-              <div>
-                <textarea
-                  value={note}
-                  onChange={(e) => setNote(e.target.value)}
-                  placeholder="Share your thoughts about these moments..."
-                  className="w-full bg-white/10 backdrop-blur-sm px-4 py-3 rounded-xl border border-white/20 focus:border-white/40 outline-none resize-none text-white placeholder:text-white/40"
-                  rows={3}
-                  maxLength={280}
-                  data-testid="photo-note-input"
-                />
-                <div className="flex items-center justify-between mt-2">
-                  <span className="text-xs text-white/50">{note.length}/280</span>
-                  {isEditingNote && note && (
-                    <button
-                      onClick={() => setIsEditingNote(false)}
-                      className="text-xs text-white hover:text-white/80 transition-colors"
-                    >
-                      Done
-                    </button>
-                  )}
-                </div>
-              </div>
+          </div>
+
+          {/* Navigation & Upload Buttons */}
+          <div className="flex gap-3">
+            {!isLastPhoto ? (
+              <>
+                <button
+                  onClick={goToNextPhoto}
+                  className="flex-1 bg-white hover:bg-gray-100 py-4 rounded-2xl text-black font-semibold flex items-center justify-center gap-2 transition-all"
+                >
+                  Next Photo
+                  <ChevronRight className="w-5 h-5" />
+                </button>
+              </>
             ) : (
-              <div className="bg-white/10 backdrop-blur-sm px-4 py-3 rounded-xl border border-white/20">
-                <p className="text-white/90 text-sm">{note}</p>
-              </div>
+              <button
+                onClick={uploadPhotos}
+                disabled={uploading}
+                className="flex-1 bg-white hover:bg-gray-100 py-4 rounded-2xl text-black font-semibold flex items-center justify-center gap-2 transition-all disabled:opacity-50"
+                data-testid="upload-btn"
+              >
+                {uploading ? (
+                  <>
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-black" />
+                    Uploading...
+                  </>
+                ) : (
+                  <>
+                    <Send className="w-5 h-5" />
+                    Upload {selectedPhotos.length} Photo{selectedPhotos.length !== 1 ? 's' : ''}
+                  </>
+                )}
+              </button>
             )}
           </div>
 
-          {/* Action Buttons */}
-          <div className="flex gap-3">
-            <button
-              onClick={() => setShowReview(false)}
-              disabled={uploading}
-              className="flex-1 bg-white/10 hover:bg-white/20 py-4 rounded-2xl text-white font-medium flex items-center justify-center gap-2 transition-all disabled:opacity-50"
-            >
-              Add More
-            </button>
+          {/* Skip all notes option */}
+          {isLastPhoto && !uploading && (
             <button
               onClick={uploadPhotos}
-              disabled={uploading}
-              className="flex-[2] bg-white hover:bg-gray-100 py-4 rounded-2xl text-black font-semibold flex items-center justify-center gap-2 transition-all disabled:opacity-50"
-              data-testid="upload-btn"
+              className="w-full mt-3 py-3 text-white/70 hover:text-white text-sm font-medium transition-colors"
             >
-              {uploading ? (
-                <>
-                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-black" />
-                  Uploading...
-                </>
-              ) : (
-                <>
-                  <Check className="w-5 h-5" />
-                  Upload {selectedPhotos.length} Photo{selectedPhotos.length !== 1 ? 's' : ''}
-                </>
-              )}
+              {notesAdded === 0 ? 'Upload without notes' : `Upload (${notesAdded} note${notesAdded !== 1 ? 's' : ''})`}
             </button>
-          </div>
+          )}
         </div>
       </div>
     );
@@ -397,7 +443,6 @@ const GuestCamera = () => {
         capture="environment"
         onChange={handleFileSelect}
         className="hidden"
-        data-testid="camera-input"
       />
       <input
         ref={galleryInputRef}
@@ -406,12 +451,11 @@ const GuestCamera = () => {
         multiple
         onChange={handleFileSelect}
         className="hidden"
-        data-testid="gallery-input"
       />
 
       {/* Header */}
       <div className="p-4">
-        <div className="glass rounded-2xl p-4 flex items-center justify-between">
+        <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-4 flex items-center justify-between border border-white/10">
           <div className="flex items-center gap-3">
             {event.logo_url && (
               <img
@@ -462,6 +506,9 @@ const GuestCamera = () => {
                 >
                   <X className="w-3 h-3" />
                 </button>
+                <div className="absolute bottom-1 left-1 bg-black/60 px-1.5 py-0.5 rounded text-[10px] text-white">
+                  {index + 1}
+                </div>
               </div>
             ))}
             {canAddMore && (
@@ -480,28 +527,25 @@ const GuestCamera = () => {
       <div className="flex-1 flex flex-col items-center justify-center px-6 py-8">
         {selectedPhotos.length === 0 ? (
           <>
-            {/* Empty State */}
             <div className="w-32 h-32 rounded-full bg-white/10 flex items-center justify-center mb-8">
               <Camera className="w-16 h-16 text-white/60" />
             </div>
-
             <h3 className="text-2xl font-bold text-white mb-2 text-center">
               Share Your Moments
             </h3>
             <p className="text-white/60 text-center mb-8 max-w-sm">
-              Take photos or choose from gallery. You can select up to {Math.min(photoCount.remaining, MAX_PHOTOS_PER_BATCH)} photos at once.
+              Select up to {Math.min(photoCount.remaining, MAX_PHOTOS_PER_BATCH)} photos, then add a note to each one
             </p>
           </>
         ) : (
           <>
-            {/* Photos Selected State */}
             <h3 className="text-xl font-bold text-white mb-2 text-center">
-              {canAddMore ? 'Add more photos?' : 'Ready to upload!'}
+              {canAddMore ? 'Add more photos?' : 'Ready to continue!'}
             </h3>
             <p className="text-white/60 text-center mb-8 max-w-sm">
               {canAddMore 
                 ? `You can add ${getMaxSelectablePhotos()} more photo${getMaxSelectablePhotos() !== 1 ? 's' : ''}`
-                : 'Tap continue to add a note and upload'}
+                : 'Tap continue to add notes to your photos'}
             </p>
           </>
         )}
@@ -510,7 +554,6 @@ const GuestCamera = () => {
         <div className="w-full max-w-sm space-y-4">
           {canAddMore && (
             <>
-              {/* Take Photo Button */}
               <button
                 onClick={openCamera}
                 className="w-full bg-white hover:bg-gray-100 py-5 rounded-2xl text-black font-semibold flex items-center justify-center gap-3 transition-all text-lg"
@@ -520,7 +563,6 @@ const GuestCamera = () => {
                 Take Photo
               </button>
 
-              {/* Choose from Gallery Button */}
               <button
                 onClick={openGallery}
                 className="w-full bg-white/10 hover:bg-white/20 border border-white/20 py-5 rounded-2xl text-white font-semibold flex items-center justify-center gap-3 transition-all text-lg"
@@ -532,10 +574,9 @@ const GuestCamera = () => {
             </>
           )}
 
-          {/* Continue Button - Show when photos are selected */}
           {selectedPhotos.length > 0 && (
             <button
-              onClick={proceedToReview}
+              onClick={proceedToNotes}
               className="w-full bg-white hover:bg-gray-100 py-5 rounded-2xl text-black font-semibold flex items-center justify-center gap-3 transition-all text-lg"
               data-testid="continue-btn"
             >
@@ -548,15 +589,11 @@ const GuestCamera = () => {
 
       {/* Footer */}
       <div className="p-6 text-center">
-        {photoCount.remaining > 0 ? (
-          <p className="text-white/60 text-sm">
-            You can upload {photoCount.remaining} more photo{photoCount.remaining !== 1 ? 's' : ''} total
-          </p>
-        ) : (
-          <p className="text-red-400 text-sm font-medium">
-            Photo limit reached
-          </p>
-        )}
+        <p className={`text-sm ${photoCount.remaining > 0 ? 'text-white/60' : 'text-red-400 font-medium'}`}>
+          {photoCount.remaining > 0 
+            ? `You can upload ${photoCount.remaining} more photo${photoCount.remaining !== 1 ? 's' : ''} total`
+            : 'Photo limit reached'}
+        </p>
       </div>
     </div>
   );
