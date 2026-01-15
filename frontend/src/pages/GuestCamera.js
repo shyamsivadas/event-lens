@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import FingerprintJS from '@fingerprintjs/fingerprintjs';
-import { SwitchCamera, Zap, ZapOff, MessageSquare, X, Send, RotateCcw, Check, Pencil } from 'lucide-react';
+import { Camera, ImagePlus, MessageSquare, RotateCcw, Check, Pencil, X } from 'lucide-react';
 import { toast } from 'sonner';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
@@ -10,41 +10,32 @@ const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const GuestCamera = () => {
   const { shareUrl } = useParams();
   const navigate = useNavigate();
-  const videoRef = useRef(null);
-  const canvasRef = useRef(null);
-  const previewCanvasRef = useRef(null);
-  const streamRef = useRef(null);
+  const cameraInputRef = useRef(null);
+  const galleryInputRef = useRef(null);
   
   const [event, setEvent] = useState(null);
   const [deviceId, setDeviceId] = useState(null);
   const [photoCount, setPhotoCount] = useState({ used: 0, max: 5 });
-  const [facingMode, setFacingMode] = useState('environment');
-  const [flash, setFlash] = useState(false);
-  const [capturing, setCapturing] = useState(false);
-  const [showFlash, setShowFlash] = useState(false);
   const [loading, setLoading] = useState(true);
   
   // Preview & Notes feature
   const [showPreview, setShowPreview] = useState(false);
   const [previewUrl, setPreviewUrl] = useState(null);
-  const [pendingCapture, setPendingCapture] = useState(null);
+  const [selectedFile, setSelectedFile] = useState(null);
   const [note, setNote] = useState('');
   const [isEditingNote, setIsEditingNote] = useState(false);
   const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
-    initializeCamera();
+    initializeApp();
     return () => {
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach(track => track.stop());
-      }
       if (previewUrl) {
         URL.revokeObjectURL(previewUrl);
       }
     };
-  }, [shareUrl, facingMode]);
+  }, [shareUrl]);
 
-  const initializeCamera = async () => {
+  const initializeApp = async () => {
     try {
       const fp = await FingerprintJS.load();
       const result = await fp.get();
@@ -64,69 +55,53 @@ const GuestCamera = () => {
         return;
       }
 
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: facingMode,
-          width: { ideal: 1920 },
-          height: { ideal: 1080 }
-        },
-        audio: false
-      });
-
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        streamRef.current = stream;
-      }
-
       setLoading(false);
     } catch (error) {
-      console.error('Camera initialization error:', error);
-      toast.error('Failed to access camera');
+      console.error('Initialization error:', error);
+      toast.error('Failed to load event');
     }
   };
 
-  const switchCamera = async () => {
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop());
+  const handleFileSelect = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please select an image file');
+      return;
     }
-    setFacingMode(facingMode === 'environment' ? 'user' : 'environment');
+
+    // Validate file size (max 20MB)
+    if (file.size > 20 * 1024 * 1024) {
+      toast.error('Image size must be less than 20MB');
+      return;
+    }
+
+    const url = URL.createObjectURL(file);
+    setSelectedFile(file);
+    setPreviewUrl(url);
+    setShowPreview(true);
+    setNote('');
+    setIsEditingNote(false);
+
+    // Reset input so same file can be selected again
+    e.target.value = '';
   };
 
-  const capturePhoto = async () => {
-    if (capturing || photoCount.remaining <= 0) return;
-
-    setCapturing(true);
-    setShowFlash(true);
-    setTimeout(() => setShowFlash(false), 200);
-
-    // Capture the image
-    const video = videoRef.current;
-    const canvas = canvasRef.current;
-    
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    
-    const ctx = canvas.getContext('2d');
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-    // Convert to blob
-    canvas.toBlob((blob) => {
-      const url = URL.createObjectURL(blob);
-      setPendingCapture(blob);
-      setPreviewUrl(url);
-      setShowPreview(true);
-      setNote('');
-      setIsEditingNote(false);
-      setCapturing(false);
-    }, 'image/jpeg', 0.92);
+  const openCamera = () => {
+    cameraInputRef.current?.click();
   };
 
-  const retakePhoto = () => {
-    // Clean up preview
+  const openGallery = () => {
+    galleryInputRef.current?.click();
+  };
+
+  const cancelPreview = () => {
     if (previewUrl) {
       URL.revokeObjectURL(previewUrl);
     }
-    setPendingCapture(null);
+    setSelectedFile(null);
     setPreviewUrl(null);
     setShowPreview(false);
     setNote('');
@@ -134,14 +109,49 @@ const GuestCamera = () => {
   };
 
   const uploadPhoto = async () => {
-    if (!pendingCapture || uploading) return;
+    if (!selectedFile || uploading) return;
     
     setUploading(true);
 
     try {
       const filename = `photo_${Date.now()}.jpg`;
       const photoNote = note.trim();
+
+      // Convert to JPEG blob for consistency
+      const canvas = document.createElement('canvas');
+      const img = new Image();
       
+      await new Promise((resolve, reject) => {
+        img.onload = resolve;
+        img.onerror = reject;
+        img.src = previewUrl;
+      });
+
+      // Resize if needed (max 1920px)
+      const maxSize = 1920;
+      let width = img.width;
+      let height = img.height;
+      
+      if (width > maxSize || height > maxSize) {
+        if (width > height) {
+          height = (height / width) * maxSize;
+          width = maxSize;
+        } else {
+          width = (width / height) * maxSize;
+          height = maxSize;
+        }
+      }
+
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, width, height);
+
+      const blob = await new Promise((resolve) => {
+        canvas.toBlob(resolve, 'image/jpeg', 0.9);
+      });
+
+      // Get presigned URL
       const urlResponse = await axios.post(
         `${BACKEND_URL}/api/guest/${shareUrl}/presigned-url`,
         {
@@ -154,13 +164,15 @@ const GuestCamera = () => {
 
       const presignedUrl = urlResponse.data.url;
 
-      const uploadResponse = await axios.put(presignedUrl, pendingCapture, {
+      // Upload to R2
+      const uploadResponse = await axios.put(presignedUrl, blob, {
         headers: { 
           'Content-Type': 'image/jpeg'
         }
       });
 
       if (uploadResponse.status === 200) {
+        // Track upload
         await axios.post(
           `${BACKEND_URL}/api/guest/${shareUrl}/track-upload`,
           {
@@ -184,7 +196,7 @@ const GuestCamera = () => {
         if (previewUrl) {
           URL.revokeObjectURL(previewUrl);
         }
-        setPendingCapture(null);
+        setSelectedFile(null);
         setPreviewUrl(null);
         setShowPreview(false);
         setNote('');
@@ -211,7 +223,7 @@ const GuestCamera = () => {
       <div className="fixed inset-0 bg-black flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4" />
-          <p className="text-white">Loading camera...</p>
+          <p className="text-white">Loading...</p>
         </div>
       </div>
     );
@@ -221,36 +233,48 @@ const GuestCamera = () => {
   if (showPreview) {
     return (
       <div className="fixed inset-0 bg-black overflow-hidden" data-testid="photo-preview">
+        {/* Hidden file inputs */}
+        <input
+          ref={cameraInputRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          onChange={handleFileSelect}
+          className="hidden"
+        />
+        <input
+          ref={galleryInputRef}
+          type="file"
+          accept="image/*"
+          onChange={handleFileSelect}
+          className="hidden"
+        />
+
         {/* Preview Image */}
         <div className="absolute inset-0">
           {previewUrl && (
             <img 
               src={previewUrl} 
               alt="Preview" 
-              className="w-full h-full object-cover"
+              className="w-full h-full object-contain bg-black"
             />
           )}
-          {/* Dark overlay for readability */}
-          <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-transparent to-black/80" />
         </div>
 
         {/* Header */}
         <div className="absolute top-0 left-0 right-0 p-4 z-10">
           <div className="glass rounded-2xl p-4 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              {event.logo_url && (
-                <img
-                  src={event.logo_url}
-                  alt="Event logo"
-                  className="w-10 h-10 rounded-lg object-cover"
-                />
-              )}
-              <div>
-                <h2 className="font-bold text-white">{event.name}</h2>
-                <p className="text-xs text-white/70">Preview your photo</p>
-              </div>
+            <button
+              onClick={cancelPreview}
+              className="p-2 hover:bg-white/10 rounded-full transition-colors"
+            >
+              <X className="w-5 h-5 text-white" />
+            </button>
+            <div className="text-center">
+              <h2 className="font-bold text-white">{event.name}</h2>
+              <p className="text-xs text-white/70">Preview your photo</p>
             </div>
-            <div className="mono text-white font-semibold text-lg">
+            <div className="mono text-white font-semibold">
               {photoCount.used} / {photoCount.max}
             </div>
           </div>
@@ -263,7 +287,7 @@ const GuestCamera = () => {
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2">
                 <MessageSquare className="w-4 h-4 text-white/70" />
-                <span className="text-sm font-medium text-white/90">Add a note</span>
+                <span className="text-sm font-medium text-white/90">Add a note (optional)</span>
               </div>
               {note && !isEditingNote && (
                 <button
@@ -310,15 +334,15 @@ const GuestCamera = () => {
 
           {/* Action Buttons */}
           <div className="flex gap-3">
-            {/* Retake Button */}
+            {/* Choose Different Button */}
             <button
-              onClick={retakePhoto}
+              onClick={cancelPreview}
               disabled={uploading}
               className="flex-1 glass py-4 rounded-2xl text-white font-medium flex items-center justify-center gap-2 hover:bg-white/20 transition-all disabled:opacity-50"
               data-testid="retake-btn"
             >
               <RotateCcw className="w-5 h-5" />
-              Retake
+              Change
             </button>
 
             {/* Upload Button */}
@@ -346,96 +370,105 @@ const GuestCamera = () => {
     );
   }
 
-  // Camera Screen
+  // Main Screen - Camera & Gallery Selection
   return (
-    <div className="fixed inset-0 bg-black overflow-hidden" data-testid="guest-camera">
-      {/* Video element */}
-      <video
-        ref={videoRef}
-        autoPlay
-        playsInline
-        muted
-        className="absolute inset-0 w-full h-full object-cover"
-        data-testid="camera-video"
+    <div className="fixed inset-0 bg-gradient-to-b from-gray-900 to-black overflow-hidden" data-testid="guest-camera">
+      {/* Hidden file inputs */}
+      <input
+        ref={cameraInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        onChange={handleFileSelect}
+        className="hidden"
+        data-testid="camera-input"
       />
-      
-      {/* Capture canvas (hidden) */}
-      <canvas ref={canvasRef} className="hidden" />
+      <input
+        ref={galleryInputRef}
+        type="file"
+        accept="image/*"
+        onChange={handleFileSelect}
+        className="hidden"
+        data-testid="gallery-input"
+      />
 
-      {/* Flash effect */}
-      {showFlash && (
-        <div className="absolute inset-0 bg-white flash-effect z-50" />
-      )}
-
-      {/* UI Overlay */}
-      <div className="absolute inset-0 z-10 flex flex-col">
+      {/* Content */}
+      <div className="h-full flex flex-col">
         {/* Header */}
-        <div className="glass p-4 m-4 rounded-2xl flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            {event.logo_url && (
-              <img
-                src={event.logo_url}
-                alt="Event logo"
-                className="w-10 h-10 rounded-lg object-cover"
-              />
-            )}
-            <div>
-              <h2 className="font-bold text-white">{event.name}</h2>
-              <p className="text-xs text-white/70">{event.date}</p>
+        <div className="p-4">
+          <div className="glass rounded-2xl p-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              {event.logo_url && (
+                <img
+                  src={event.logo_url}
+                  alt="Event logo"
+                  className="w-12 h-12 rounded-xl object-cover"
+                />
+              )}
+              <div>
+                <h2 className="font-bold text-white text-lg">{event.name}</h2>
+                <p className="text-sm text-white/70">{event.date}</p>
+              </div>
+            </div>
+            <div className="text-right">
+              <div className="mono text-white font-bold text-2xl" data-testid="photo-counter">
+                {photoCount.used}/{photoCount.max}
+              </div>
+              <p className="text-xs text-white/60">photos</p>
             </div>
           </div>
-          <div className="mono text-white font-semibold text-lg" data-testid="photo-counter">
-            {photoCount.used} / {photoCount.max}
+        </div>
+
+        {/* Main Content */}
+        <div className="flex-1 flex flex-col items-center justify-center px-6">
+          {/* Illustration/Icon */}
+          <div className="w-32 h-32 rounded-full bg-white/10 flex items-center justify-center mb-8">
+            <Camera className="w-16 h-16 text-white/60" />
           </div>
-        </div>
 
-        <div className="flex-1" />
-
-        {/* Hint text */}
-        <div className="text-center mb-4">
-          <p className="text-white/60 text-sm bg-black/30 inline-block px-4 py-2 rounded-full">
-            📸 Tap to capture, then preview before uploading
+          <h3 className="text-2xl font-bold text-white mb-2 text-center">
+            Share Your Moment
+          </h3>
+          <p className="text-white/60 text-center mb-8 max-w-sm">
+            Take a new photo or choose one from your gallery to share with everyone
           </p>
-        </div>
 
-        {/* Controls */}
-        <div className="p-8 flex items-center justify-between">
-          <button
-            onClick={switchCamera}
-            className="glass p-4 rounded-full text-white hover:bg-white/20 transition-all"
-            data-testid="switch-camera-btn"
-          >
-            <SwitchCamera className="w-6 h-6" />
-          </button>
+          {/* Action Buttons */}
+          <div className="w-full max-w-sm space-y-4">
+            {/* Take Photo Button */}
+            <button
+              onClick={openCamera}
+              disabled={photoCount.remaining <= 0}
+              className="w-full bg-primary hover:bg-primary/90 py-5 rounded-2xl text-white font-semibold flex items-center justify-center gap-3 transition-all disabled:opacity-50 disabled:cursor-not-allowed text-lg"
+              data-testid="take-photo-btn"
+            >
+              <Camera className="w-6 h-6" />
+              Take Photo
+            </button>
 
-          <button
-            onClick={capturePhoto}
-            disabled={capturing || photoCount.remaining <= 0}
-            className="capture-button"
-            data-testid="capture-btn"
-          >
-            {capturing && (
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white" />
-              </div>
-            )}
-          </button>
-
-          <button
-            onClick={() => setFlash(!flash)}
-            className="glass p-4 rounded-full text-white hover:bg-white/20 transition-all"
-            data-testid="flash-toggle-btn"
-          >
-            {flash ? <Zap className="w-6 h-6" /> : <ZapOff className="w-6 h-6" />}
-          </button>
+            {/* Choose from Gallery Button */}
+            <button
+              onClick={openGallery}
+              disabled={photoCount.remaining <= 0}
+              className="w-full glass hover:bg-white/20 py-5 rounded-2xl text-white font-semibold flex items-center justify-center gap-3 transition-all disabled:opacity-50 disabled:cursor-not-allowed text-lg"
+              data-testid="gallery-btn"
+            >
+              <ImagePlus className="w-6 h-6" />
+              Choose from Gallery
+            </button>
+          </div>
         </div>
 
         {/* Footer */}
-        <div className="text-center pb-6 text-white/70 text-sm">
+        <div className="p-6 text-center">
           {photoCount.remaining > 0 ? (
-            <p>You can take {photoCount.remaining} more photo{photoCount.remaining !== 1 ? 's' : ''}</p>
+            <p className="text-white/60 text-sm">
+              You can upload {photoCount.remaining} more photo{photoCount.remaining !== 1 ? 's' : ''}
+            </p>
           ) : (
-            <p>Photo limit reached</p>
+            <p className="text-red-400 text-sm font-medium">
+              Photo limit reached
+            </p>
           )}
         </div>
       </div>
