@@ -69,18 +69,13 @@ const PhotoGallery = ({ photos, eventName }) => {
 
   const downloadPhoto = async (photo, e) => {
     if (e) e.stopPropagation();
+    
     try {
-      // Method 1: Try direct download link
-      const link = document.createElement('a');
-      link.href = photo.download_url;
-      link.download = photo.filename || 'photo.jpg';
-      link.target = '_blank';
-      link.rel = 'noopener noreferrer';
+      // Use direct download endpoint
+      const downloadUrl = `${BACKEND_URL}/api/photos/${photo.photo_id}/download`;
       
-      // For cross-origin images, we need to fetch and create blob
-      const response = await fetch(photo.download_url, {
-        mode: 'cors',
-        credentials: 'omit'
+      const response = await fetch(downloadUrl, {
+        credentials: 'include'
       });
       
       if (!response.ok) throw new Error('Download failed');
@@ -88,20 +83,18 @@ const PhotoGallery = ({ photos, eventName }) => {
       const blob = await response.blob();
       const blobUrl = window.URL.createObjectURL(blob);
       
+      const link = document.createElement('a');
       link.href = blobUrl;
+      link.download = photo.filename || 'photo.jpg';
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       
-      // Clean up blob URL after a delay
       setTimeout(() => window.URL.revokeObjectURL(blobUrl), 1000);
-      
       toast.success('Photo downloaded!');
     } catch (error) {
       console.error('Download error:', error);
-      // Fallback: Open in new tab
-      window.open(photo.download_url, '_blank');
-      toast.info('Opening photo in new tab - right click to save');
+      toast.error('Failed to download photo');
     }
   };
 
