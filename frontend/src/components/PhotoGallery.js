@@ -68,19 +68,38 @@ const PhotoGallery = ({ photos, eventName }) => {
   const downloadPhoto = async (photo, e) => {
     if (e) e.stopPropagation();
     try {
-      const response = await fetch(photo.download_url);
+      // Method 1: Try direct download link
+      const link = document.createElement('a');
+      link.href = photo.download_url;
+      link.download = photo.filename || 'photo.jpg';
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      
+      // For cross-origin images, we need to fetch and create blob
+      const response = await fetch(photo.download_url, {
+        mode: 'cors',
+        credentials: 'omit'
+      });
+      
+      if (!response.ok) throw new Error('Download failed');
+      
       const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = photo.filename;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
+      const blobUrl = window.URL.createObjectURL(blob);
+      
+      link.href = blobUrl;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      // Clean up blob URL after a delay
+      setTimeout(() => window.URL.revokeObjectURL(blobUrl), 1000);
+      
       toast.success('Photo downloaded!');
     } catch (error) {
-      toast.error('Failed to download photo');
+      console.error('Download error:', error);
+      // Fallback: Open in new tab
+      window.open(photo.download_url, '_blank');
+      toast.info('Opening photo in new tab - right click to save');
     }
   };
 
