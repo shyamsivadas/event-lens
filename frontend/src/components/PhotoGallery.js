@@ -411,22 +411,22 @@ const PhotoGallery = ({ photos, eventName }) => {
                 </div>
               )}
               
-              {/* Hover Actions */}
-              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-all duration-300 flex items-center justify-center gap-3 opacity-0 group-hover:opacity-100">
+              {/* Hover Actions - Bottom Corner */}
+              <div className="absolute bottom-3 right-3 flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-all duration-300">
                 <button
                   onClick={(e) => downloadPhoto(photo, e)}
-                  className="p-3 bg-white rounded-full hover:bg-gray-100 transition-colors shadow-lg"
+                  className="p-2 bg-white/90 backdrop-blur-sm rounded-full hover:bg-white transition-colors shadow-md"
                   title="Download"
                 >
-                  <Download className="w-5 h-5 text-gray-800" />
+                  <Download className="w-4 h-4 text-gray-700" />
                 </button>
                 <div className="relative">
                   <button
                     onClick={(e) => toggleShareMenu(index, e)}
-                    className="p-3 bg-white rounded-full hover:bg-gray-100 transition-colors shadow-lg"
+                    className="p-2 bg-white/90 backdrop-blur-sm rounded-full hover:bg-white transition-colors shadow-md"
                     title="Share"
                   >
-                    <Share2 className="w-5 h-5 text-gray-800" />
+                    <Share2 className="w-4 h-4 text-gray-700" />
                   </button>
                   {showShareMenu === index && <ShareMenu photo={photo} index={index} />}
                 </div>
