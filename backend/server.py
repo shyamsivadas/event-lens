@@ -288,6 +288,48 @@ async def get_event_photos(event_id: str, current_user: User = Depends(get_curre
     
     return photos
 
+@api_router.get("/photos/{photo_id}/download")
+async def download_photo(photo_id: str, current_user: User = Depends(get_current_user)):
+    """Direct download endpoint for individual photos"""
+    photo_doc = await db.photos.find_one(
+        {"photo_id": photo_id},
+        {"_id": 0}
+    )
+    
+    if not photo_doc:
+        raise HTTPException(status_code=404, detail="Photo not found")
+    
+    # Verify user owns the event
+    event_doc = await db.events.find_one(
+        {"event_id": photo_doc["event_id"], "host_id": current_user.user_id},
+        {"_id": 0}
+    )
+    
+    if not event_doc:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    r2_client = get_r2_client()
+    if not r2_client:
+        raise HTTPException(status_code=500, detail="Storage not configured")
+    
+    try:
+        bucket_name = os.getenv('R2_BUCKET_NAME', 'event-photos')
+        response = r2_client.get_object(Bucket=bucket_name, Key=photo_doc['s3_key'])
+        
+        filename = photo_doc.get('filename', 'photo.jpg')
+        
+        return StreamingResponse(
+            response['Body'],
+            media_type='image/jpeg',
+            headers={
+                'Content-Disposition': f'attachment; filename="{filename}"',
+                'Content-Type': 'image/jpeg'
+            }
+        )
+    except Exception as e:
+        logger.error(f"Failed to download photo: {e}")
+        raise HTTPException(status_code=500, detail="Failed to download photo")
+
 @api_router.get("/guest/{share_url}")
 async def get_guest_event(share_url: str):
     event_doc = await db.events.find_one(
