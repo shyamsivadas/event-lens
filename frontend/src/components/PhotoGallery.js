@@ -281,18 +281,12 @@ const PhotoGallery = ({ photos, eventName }) => {
 
             {/* Info Box */}
             <div className="relative pr-12">
-              {/* Meta Tag */}
-              <div className="text-[11px] font-bold uppercase tracking-wide text-gray-500 mb-1">
-                {photo.note ? 'Guest Note' : `Photo ${index + 1}`}
-              </div>
-              
-              {/* Title - Use note preview or generic title */}
-              <h3 className="text-xl font-bold text-gray-900 leading-tight mb-1 line-clamp-2">
-                {photo.note 
-                  ? (photo.note.length > 30 ? photo.note.substring(0, 30) + '...' : photo.note)
-                  : `Moment #${index + 1}`
-                }
-              </h3>
+              {/* Note Text */}
+              {photo.note && (
+                <p className="text-lg font-medium text-gray-900 leading-snug mb-1">
+                  {photo.note}
+                </p>
+              )}
               
               {/* Caption - Date */}
               <p className="text-sm text-gray-500">
