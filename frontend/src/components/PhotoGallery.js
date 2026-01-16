@@ -1,12 +1,20 @@
 import React, { useState, useEffect } from 'react';
-import { X, Download, Share2, ChevronLeft, ChevronRight, ZoomIn, Heart, MessageSquare } from 'lucide-react';
+import { X, Download, Share2, ChevronLeft, ChevronRight, MessageSquare } from 'lucide-react';
 import { toast } from 'sonner';
 
 const PhotoGallery = ({ photos, eventName }) => {
   const [selectedPhoto, setSelectedPhoto] = useState(null);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [favorites, setFavorites] = useState([]);
   const [downloading, setDownloading] = useState(false);
+
+  // Clip path variations for the "cut paper" look
+  const clipPaths = [
+    'polygon(0 0, 100% 4%, 100% 96%, 0 100%)',      // Slant down-right
+    'polygon(0 4%, 100% 0, 100% 100%, 0 96%)',      // Slant up-right
+    'polygon(0 0, 100% 6%, 100% 94%, 0 100%)',      // Aggressive cut
+    'polygon(0 3%, 100% 0, 100% 97%, 0 100%)',      // Subtle slant
+    'polygon(0 0, 100% 5%, 100% 100%, 0 95%)',      // Mixed
+  ];
 
   const openLightbox = (photo, index) => {
     setSelectedPhoto(photo);
@@ -27,14 +35,6 @@ const PhotoGallery = ({ photos, eventName }) => {
     const newIndex = (currentIndex - 1 + photos.length) % photos.length;
     setCurrentIndex(newIndex);
     setSelectedPhoto(photos[newIndex]);
-  };
-
-  const toggleFavorite = (photoId) => {
-    if (favorites.includes(photoId)) {
-      setFavorites(favorites.filter(id => id !== photoId));
-    } else {
-      setFavorites([...favorites, photoId]);
-    }
   };
 
   const downloadPhoto = async (photo) => {
@@ -97,10 +97,9 @@ const PhotoGallery = ({ photos, eventName }) => {
       try {
         await navigator.share({
           title: eventName,
-          text: 'Check out this photo!',
+          text: photo.note || 'Check out this photo!',
           url: photo.download_url
         });
-        toast.success('Shared successfully!');
       } catch (error) {
         if (error.name !== 'AbortError') {
           copyToClipboard(photo.download_url);
@@ -114,28 +113,8 @@ const PhotoGallery = ({ photos, eventName }) => {
   const copyToClipboard = (url) => {
     if (navigator.clipboard && window.isSecureContext) {
       navigator.clipboard.writeText(url)
-        .then(() => toast.success('Link copied to clipboard!'))
-        .catch(() => fallbackCopyToClipboard(url));
-    } else {
-      fallbackCopyToClipboard(url);
-    }
-  };
-
-  const fallbackCopyToClipboard = (url) => {
-    const textArea = document.createElement('textarea');
-    textArea.value = url;
-    textArea.style.position = 'fixed';
-    textArea.style.left = '-999999px';
-    document.body.appendChild(textArea);
-    textArea.focus();
-    textArea.select();
-    try {
-      document.execCommand('copy');
-      toast.success('Link copied to clipboard!');
-    } catch (err) {
-      toast.error('Failed to copy link');
-    } finally {
-      textArea.remove();
+        .then(() => toast.success('Link copied!'))
+        .catch(() => toast.error('Failed to copy'));
     }
   };
 
@@ -150,69 +129,17 @@ const PhotoGallery = ({ photos, eventName }) => {
     return () => window.removeEventListener('keydown', handleKeyPress);
   }, [selectedPhoto, currentIndex]);
 
-  // Simple photo grid
-  const renderPhotoGrid = () => (
-    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-      {photos.map((photo, index) => (
-        <div
-          key={photo.photo_id}
-          className="group relative aspect-square cursor-pointer overflow-hidden bg-gray-100 rounded-xl"
-          onClick={() => openLightbox(photo, index)}
-          data-testid={`photo-${index}`}
-        >
-          {photo.download_url ? (
-            <img
-              src={photo.download_url}
-              alt={photo.filename}
-              className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-              loading="lazy"
-            />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center text-gray-400">
-              <ZoomIn className="w-8 h-8" />
-            </div>
-          )}
-          
-          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-all duration-300" />
-          
-          {/* Note indicator on hover */}
-          {photo.note && (
-            <div className="absolute bottom-2 left-2 right-2 bg-black/70 backdrop-blur-sm rounded-lg px-2 py-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
-              <div className="flex items-start gap-1.5">
-                <MessageSquare className="w-3 h-3 text-white/70 flex-shrink-0 mt-0.5" />
-                <p className="text-xs text-white line-clamp-2">{photo.note}</p>
-              </div>
-            </div>
-          )}
-          
-          {/* Note badge (always visible) */}
-          {photo.note && (
-            <div className="absolute bottom-2 right-2 p-1.5 bg-primary rounded-full group-hover:opacity-0 transition-opacity">
-              <MessageSquare className="w-3 h-3 text-white" />
-            </div>
-          )}
-          
-          {/* Favorite button */}
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              toggleFavorite(photo.photo_id);
-            }}
-            className="absolute top-3 right-3 p-1.5 bg-white/90 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300 hover:bg-white"
-            data-testid={`favorite-${index}`}
-          >
-            <Heart
-              className={`w-4 h-4 ${
-                favorites.includes(photo.photo_id)
-                  ? 'fill-red-500 text-red-500'
-                  : 'text-gray-700'
-              }`}
-            />
-          </button>
-        </div>
-      ))}
-    </div>
-  );
+  // Format date/time for display
+  const formatDate = (dateString) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', { 
+      month: 'short', 
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit'
+    });
+  };
 
   // Lightbox
   const renderLightbox = () => {
@@ -222,12 +149,10 @@ const PhotoGallery = ({ photos, eventName }) => {
       <div className="fixed inset-0 z-50 bg-black/95 flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4">
-          <div className="flex items-center gap-4">
-            <button onClick={closeLightbox} className="p-2 hover:bg-white/10 rounded-full transition-colors">
-              <X className="w-5 h-5 text-white" />
-            </button>
-            <span className="text-sm text-white/60">{currentIndex + 1} / {photos.length}</span>
-          </div>
+          <button onClick={closeLightbox} className="p-2 hover:bg-white/10 rounded-full transition-colors">
+            <X className="w-5 h-5 text-white" />
+          </button>
+          <span className="text-white/60 text-sm">{currentIndex + 1} / {photos.length}</span>
           <div className="flex items-center gap-2">
             <button onClick={() => sharePhoto(selectedPhoto)} className="p-2 hover:bg-white/10 rounded-full transition-colors">
               <Share2 className="w-5 h-5 text-white" />
@@ -238,7 +163,7 @@ const PhotoGallery = ({ photos, eventName }) => {
           </div>
         </div>
 
-        {/* Image container */}
+        {/* Image */}
         <div className="flex-1 flex flex-col items-center justify-center p-4 relative">
           {photos.length > 1 && (
             <>
@@ -257,7 +182,7 @@ const PhotoGallery = ({ photos, eventName }) => {
             className="max-h-[60vh] max-w-full object-contain rounded-lg" 
           />
           
-          {/* Note display */}
+          {/* Note */}
           {selectedPhoto.note && (
             <div className="mt-4 max-w-lg w-full">
               <div className="bg-white/10 backdrop-blur-sm rounded-xl px-4 py-3">
@@ -270,7 +195,7 @@ const PhotoGallery = ({ photos, eventName }) => {
           )}
         </div>
 
-        {/* Thumbnail strip */}
+        {/* Thumbnails */}
         <div className="p-4 bg-black/50">
           <div className="flex gap-2 overflow-x-auto justify-center pb-2">
             {photos.map((photo, index) => (
@@ -293,23 +218,97 @@ const PhotoGallery = ({ photos, eventName }) => {
   return (
     <>
       {/* Gallery Controls */}
-      <div className="flex items-center justify-between mb-6">
-        <span className="text-sm text-gray-500">
-          {photos.length} {photos.length === 1 ? 'Photo' : 'Photos'}
-        </span>
+      <div className="flex items-center justify-between mb-8">
+        <div>
+          <span className="text-2xl font-bold text-gray-900">{photos.length}</span>
+          <span className="text-gray-500 ml-2">Moments Captured</span>
+        </div>
         
         <button
           onClick={downloadAll}
           disabled={downloading}
-          className="px-6 py-2.5 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors text-sm font-medium disabled:opacity-50"
+          className="px-6 py-2.5 bg-black text-white rounded-full hover:bg-gray-800 transition-colors text-sm font-medium disabled:opacity-50"
           data-testid="download-all-btn"
         >
-          {downloading ? 'Downloading...' : 'Download All'}
+          {downloading ? 'Preparing...' : 'Download All'}
         </button>
       </div>
 
-      {/* Photo Grid */}
-      {renderPhotoGrid()}
+      {/* 837-Style Masonry Gallery */}
+      <div 
+        className="gallery-masonry"
+        style={{
+          columnCount: 3,
+          columnGap: '32px',
+        }}
+      >
+        <style>{`
+          @media (max-width: 900px) {
+            .gallery-masonry { column-count: 2 !important; }
+          }
+          @media (max-width: 600px) {
+            .gallery-masonry { column-count: 1 !important; }
+          }
+        `}</style>
+        
+        {photos.map((photo, index) => (
+          <div
+            key={photo.photo_id}
+            className="break-inside-avoid mb-8 group cursor-pointer"
+            onClick={() => openLightbox(photo, index)}
+            data-testid={`photo-${index}`}
+          >
+            {/* Image Container with Clip Path */}
+            <div 
+              className="relative overflow-hidden mb-3"
+              style={{
+                clipPath: clipPaths[index % clipPaths.length]
+              }}
+            >
+              {photo.download_url ? (
+                <img
+                  src={photo.download_url}
+                  alt={photo.filename}
+                  className="w-full h-auto grayscale contrast-110 group-hover:grayscale-0 transition-all duration-500"
+                  loading="lazy"
+                />
+              ) : (
+                <div className="w-full aspect-[3/4] bg-gray-200 flex items-center justify-center">
+                  <span className="text-gray-400">Loading...</span>
+                </div>
+              )}
+            </div>
+
+            {/* Info Box */}
+            <div className="relative pr-12">
+              {/* Meta Tag */}
+              <div className="text-[11px] font-bold uppercase tracking-wide text-gray-500 mb-1">
+                {photo.note ? 'Guest Note' : `Photo ${index + 1}`}
+              </div>
+              
+              {/* Title - Use note preview or generic title */}
+              <h3 className="text-xl font-bold text-gray-900 leading-tight mb-1 line-clamp-2">
+                {photo.note 
+                  ? (photo.note.length > 30 ? photo.note.substring(0, 30) + '...' : photo.note)
+                  : `Moment #${index + 1}`
+                }
+              </h3>
+              
+              {/* Caption - Date */}
+              <p className="text-sm text-gray-500">
+                {formatDate(photo.uploaded_at)}
+              </p>
+
+              {/* Logo Badge */}
+              <div className="absolute right-0 bottom-0 w-9 h-9 border border-gray-900 rounded-full flex items-center justify-center">
+                <span className="text-[8px] font-bold text-center leading-none">
+                  {eventName.substring(0, 3).toUpperCase()}
+                </span>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
 
       {/* Lightbox */}
       {renderLightbox()}
