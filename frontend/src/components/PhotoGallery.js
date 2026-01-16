@@ -27,6 +27,8 @@ const TwitterIcon = () => (
   </svg>
 );
 
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
+
 const PhotoGallery = ({ photos, eventName }) => {
   const [selectedPhoto, setSelectedPhoto] = useState(null);
   const [currentIndex, setCurrentIndex] = useState(0);
