@@ -271,11 +271,13 @@ async def get_event_photos(event_id: str, current_user: User = Depends(get_curre
         bucket_name = os.getenv('R2_BUCKET_NAME', 'event-photos')
         for photo in photos:
             try:
+                # Generate presigned URL with content-disposition for download
                 presigned_url = r2_client.generate_presigned_url(
                     ClientMethod='get_object',
                     Params={
                         'Bucket': bucket_name,
-                        'Key': photo['s3_key']
+                        'Key': photo['s3_key'],
+                        'ResponseContentDisposition': f'attachment; filename="{photo.get("filename", "photo.jpg")}"'
                     },
                     ExpiresIn=3600
                 )
